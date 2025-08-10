@@ -9,13 +9,6 @@ import SettingsScreen from './screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 
-// 你也可以暫時開這個 inline 畫面做測試：
-// const ReportsInline = () => (
-//   <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-//     <Text>Hello Reports Inline</Text>
-//   </View>
-// );
-
 export default function App() {
   return (
     <NavigationContainer>
