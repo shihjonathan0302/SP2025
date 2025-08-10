@@ -1,0 +1,31 @@
+{
+  "name": "sp2025",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shihjonathan0302/SP2025.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/shihjonathan0302/SP2025/issues"
+  },
+  "homepage": "https://github.com/shihjonathan0302/SP2025#readme",
+  "dependencies": {
+    "@react-navigation/bottom-tabs": "^7.4.5",
+    "@react-navigation/native": "^7.1.17",
+    "expo": "^53.0.20",
+    "react-dom": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-web": "^0.20.0",
+    "react-native-screens": "~4.11.1",
+    "react-native-safe-area-context": "5.4.0"
+  }
+}
