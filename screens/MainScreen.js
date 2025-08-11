@@ -1,26 +1,16 @@
 // screens/MainScreen.js
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  Button,
-  Modal,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  Platform,
+  View, Text, FlatList, Button, Modal, TextInput,
+  StyleSheet, TouchableOpacity, Alert, Platform
 } from 'react-native';
+import { useGoals, calcProgress } from '../contexts/GoalsContext';
 
-export default function MainScreen({ navigation }) {   // ← 讓它拿到 navigation
-  const [goals, setGoals] = useState([
-    { id: '1', title: 'Learn JavaScript', progress: 40, etaDays: 30 },
-    { id: '2', title: 'Pass TOEFL', progress: 10, etaDays: 120 },
-  ]);
+export default function MainScreen({ navigation }) {
+  const { goals, addGoal, removeGoal, updateGoal } = useGoals();
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [mode, setMode] = useState('add');
+  const [mode, setMode] = useState('add'); // 'add' | 'edit'
   const [editingId, setEditingId] = useState(null);
   const [title, setTitle] = useState('');
   const [etaDays, setEtaDays] = useState('');
@@ -28,8 +18,11 @@ export default function MainScreen({ navigation }) {   // ← 讓它拿到 navig
   const openAdd = () => {
     setMode('add'); setEditingId(null); setTitle(''); setEtaDays(''); setModalVisible(true);
   };
+
   const openEdit = (goal) => {
-    setMode('edit'); setEditingId(goal.id); setTitle(goal.title); setEtaDays(String(goal.etaDays ?? '')); setModalVisible(true);
+    setMode('edit'); setEditingId(goal.id);
+    setTitle(goal.title); setEtaDays(String(goal.etaDays ?? ''));
+    setModalVisible(true);
   };
 
   const saveGoal = () => {
@@ -41,11 +34,17 @@ export default function MainScreen({ navigation }) {   // ← 讓它拿到 navig
     const eta = etaDays === '' ? undefined : Math.max(0, parseInt(etaDays, 10) || 0);
 
     if (mode === 'add') {
-      const newGoal = { id: String(Date.now()), title: trimmed, progress: 0, etaDays: eta ?? 30 };
-      setGoals((prev) => [newGoal, ...prev]);
+      const newGoal = {
+        id: String(Date.now()),
+        title: trimmed,
+        etaDays: eta ?? 30,
+        subgoals: [], // Phase 2: 先空陣列；之後 Phase 3 用 AI 產生
+      };
+      addGoal(newGoal);
     } else if (mode === 'edit' && editingId) {
-      setGoals((prev) => prev.map((g) => (g.id === editingId ? { ...g, title: trimmed, etaDays: eta ?? g.etaDays } : g)));
+      updateGoal(editingId, (g) => ({ ...g, title: trimmed, etaDays: eta ?? g.etaDays }));
     }
+
     setModalVisible(false); setEditingId(null); setTitle(''); setEtaDays('');
   };
 
@@ -53,33 +52,28 @@ export default function MainScreen({ navigation }) {   // ← 讓它拿到 navig
     if (Platform.OS === 'web') {
       const ok = window.confirm?.('確定要刪除這個目標嗎？');
       if (!ok) return;
-      setGoals((prev) => prev.filter((g) => g.id !== id));
+      removeGoal(id);
     } else {
       Alert.alert('刪除目標', '確定要刪除嗎？', [
         { text: '取消' },
-        { text: '刪除', style: 'destructive', onPress: () => setGoals((prev) => prev.filter((g) => g.id !== id)) },
+        { text: '刪除', style: 'destructive', onPress: () => removeGoal(id) },
       ]);
     }
   };
 
-  const bumpProgress = (id) => {
-    setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, progress: Math.min(100, g.progress + 10) } : g)));
-  };
-
   const renderItem = ({ item }) => (
     <TouchableOpacity
-      onPress={() => navigation.navigate('GoalDetail', { goalId: item.id, title: item.title })}
+      onPress={() => navigation.navigate('GoalDetail', { goalId: item.id })}
       activeOpacity={0.7}
     >
       <View style={styles.card}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.meta}>Progress: {item.progress}% • ETA: {item.etaDays} days</Text>
+          <Text style={styles.meta}>
+            Progress: {calcProgress(item)}% • ETA: {item.etaDays} days
+          </Text>
         </View>
         <View style={styles.actions}>
-          <TouchableOpacity onPress={() => bumpProgress(item.id)} style={styles.actionBtn}>
-            <Text style={styles.actionTxt}>+10%</Text>
-          </TouchableOpacity>
           <TouchableOpacity onPress={() => openEdit(item)} style={styles.actionBtn}>
             <Text style={styles.actionTxt}>Edit</Text>
           </TouchableOpacity>
