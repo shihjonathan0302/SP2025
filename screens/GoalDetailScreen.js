@@ -1,17 +1,24 @@
-import React, { useMemo, useState } from 'react';
+// screens/GoalDetailScreen.js
+
+// 匯入 React 與 React Native 元件import React, { useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, Button,
   TouchableOpacity, Switch, Platform, Alert
 } from 'react-native';
+
+// 匯入 GoalsContext，用於讀取與更新目標資料
 import { useGoals } from '../contexts/GoalsContext';
 
 export default function GoalDetailScreen({ route, navigation }) {
   const { goalId } = route.params || {};
   const { goals, updateGoal } = useGoals();
+  // 找到對應的目標物件
   const goal = useMemo(() => goals.find(g => g.id === goalId), [goals, goalId]);
 
+ // 本地狀態：新子目標的文字輸入
   const [newTitle, setNewTitle] = useState('');
 
+  // 若目標不存在，顯示錯誤訊息
   if (!goal) {
     return (
       <View style={styles.container}>
@@ -20,14 +27,21 @@ export default function GoalDetailScreen({ route, navigation }) {
     );
   }
 
+  // 新增子目標
   const addSubgoal = () => {
     const t = newTitle.trim();
     if (!t) return;
-    const sg = { id: `${Date.now()}`, title: t, isDone: false, order: (goal.subgoals?.length || 0) + 1 };
+    const sg = { 
+      id: `${Date.now()}`, // 用時間戳作為唯一 ID
+      title: t, 
+      isDone: false, 
+      order: (goal.subgoals?.length || 0) + 1 // 排序順序
+    };
     updateGoal(goal.id, (g) => ({ ...g, subgoals: [...(g.subgoals || []), sg] }));
     setNewTitle('');
   };
 
+  // 切換子目標完成狀態
   const toggleSubgoal = (sid, isDone) => {
     updateGoal(goal.id, (g) => ({
       ...g,
@@ -35,6 +49,7 @@ export default function GoalDetailScreen({ route, navigation }) {
     }));
   };
 
+  // 刪除子目標
   const deleteSubgoal = (sid) => {
     const go = () => updateGoal(goal.id, (g) => ({ ...g, subgoals: g.subgoals.filter(s => s.id !== sid) }));
     if (Platform.OS === 'web') {
@@ -47,6 +62,7 @@ export default function GoalDetailScreen({ route, navigation }) {
     }
   };
 
+  // 渲染單一子目標項目
   const renderItem = ({ item }) => (
     <View style={styles.row}>
       <Switch value={item.isDone} onValueChange={(v) => toggleSubgoal(item.id, v)} />
@@ -61,8 +77,10 @@ export default function GoalDetailScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
+      {/* 目標標題 */}
       <Text style={styles.title}>{goal.title}</Text>
 
+      {/* 新增子目標輸入區 */}
       <View style={styles.addWrap}>
         <TextInput
           placeholder="Add a subgoal"
@@ -73,6 +91,7 @@ export default function GoalDetailScreen({ route, navigation }) {
         <Button title="Add" onPress={addSubgoal} />
       </View>
 
+      {/* 子目標列表 */}
       <FlatList
         data={goal.subgoals}
         keyExtractor={(s) => s.id}
@@ -83,6 +102,7 @@ export default function GoalDetailScreen({ route, navigation }) {
   );
 }
 
+// 樣式設定
 const styles = StyleSheet.create({
   container: { padding: 16, flex: 1 },
   title: { fontSize: 20, fontWeight: '700', marginBottom: 12 },

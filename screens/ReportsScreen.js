@@ -1,8 +1,12 @@
 // screens/ReportsScreen.js
+
+// 匯入 React 與 React Native 元件
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
+// 匯入 GoalsContext 以取得全域目標資料與計算進度方法
 import { useGoals, calcProgress } from '../contexts/GoalsContext';
 
+// 報告頁面組件
 export default function ReportsScreen() {
   const { goals } = useGoals();
 
@@ -14,6 +18,7 @@ export default function ReportsScreen() {
 
   return (
     <ScrollView style={styles.container}>
+      {/* 頁面標題 */}
       <Text style={styles.header}>Reports & Analytics</Text>
 
       {/* Statistic Cards */}
@@ -55,6 +60,7 @@ export default function ReportsScreen() {
   );
 }
 
+// 樣式設定
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5', padding: 16 },
   header: { fontSize: 24, fontWeight: '700', marginBottom: 16 },

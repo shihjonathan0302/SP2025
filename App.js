@@ -6,15 +6,18 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { GoalsProvider } from './contexts/GoalsContext';
 
+// 匯入各個螢幕組件（對應不同頁面）
 import MainScreen from './screens/MainScreen';
 import ReportsScreen from './screens/ReportsScreen';
 import SocialScreen from './screens/SocialScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import GoalDetailScreen from './screens/GoalDetailScreen';
 
+// 建立 Tab Navigator 與 Stack Navigator 實例
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
+// 定義底部標籤導航（包含 4 個主要頁面）
 function Tabs() {
   return (
     <Tab.Navigator screenOptions={{ headerTitleAlign: 'center' }}>
@@ -26,6 +29,7 @@ function Tabs() {
   );
 }
 
+// 定義頂層 Stack Navigator（用來切換 Tabs 和詳情頁面）
 function RootNavigator() {
   return (
     <Stack.Navigator>
@@ -35,6 +39,7 @@ function RootNavigator() {
   );
 }
 
+// App 入口組件
 export default function App() {
   return (
     <GoalsProvider>

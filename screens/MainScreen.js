@@ -1,4 +1,5 @@
 // screens/MainScreen.js
+
 import React, { useState } from 'react';
 import {
   View, Text, FlatList, Button, Modal, TextInput,
@@ -6,48 +7,59 @@ import {
 } from 'react-native';
 import { useGoals, calcProgress } from '../contexts/GoalsContext';
 
+// 主頁面組件
 export default function MainScreen({ navigation }) {
+   // 從 GoalsContext 中取得目標列表與操作方法
   const { goals, addGoal, removeGoal, updateGoal } = useGoals();
 
+  // 本地狀態：控制新增/編輯目標的彈窗
   const [modalVisible, setModalVisible] = useState(false);
   const [mode, setMode] = useState('add'); // 'add' | 'edit'
   const [editingId, setEditingId] = useState(null);
   const [title, setTitle] = useState('');
   const [etaDays, setEtaDays] = useState('');
 
+  // 開啟「新增目標」模式
   const openAdd = () => {
     setMode('add'); setEditingId(null); setTitle(''); setEtaDays(''); setModalVisible(true);
   };
 
+  // 開啟「編輯目標」模式，並填入該目標的現有資料
   const openEdit = (goal) => {
     setMode('edit'); setEditingId(goal.id);
     setTitle(goal.title); setEtaDays(String(goal.etaDays ?? ''));
     setModalVisible(true);
   };
 
+  // 儲存目標（新增或更新）
   const saveGoal = () => {
     const trimmed = title.trim();
     if (!trimmed) {
       if (Platform.OS === 'web') alert('請輸入目標名稱'); else Alert.alert('請輸入目標名稱');
       return;
     }
+     // 處理 ETA 天數（允許留空）
     const eta = etaDays === '' ? undefined : Math.max(0, parseInt(etaDays, 10) || 0);
 
     if (mode === 'add') {
+       // 新增目標
       const newGoal = {
-        id: String(Date.now()),
+        id: String(Date.now()), // 用時間戳當 ID
         title: trimmed,
-        etaDays: eta ?? 30,
+        etaDays: eta ?? 30, // 預設 30 天
         subgoals: [], // Phase 2: 先空陣列；之後 Phase 3 用 AI 產生
       };
       addGoal(newGoal);
     } else if (mode === 'edit' && editingId) {
+      // 更新目標
       updateGoal(editingId, (g) => ({ ...g, title: trimmed, etaDays: eta ?? g.etaDays }));
     }
 
+    // 關閉 modal 並重置表單
     setModalVisible(false); setEditingId(null); setTitle(''); setEtaDays('');
   };
 
+  // 刪除目標
   const deleteGoal = (id) => {
     if (Platform.OS === 'web') {
       const ok = window.confirm?.('確定要刪除這個目標嗎？');
@@ -61,18 +73,21 @@ export default function MainScreen({ navigation }) {
     }
   };
 
+  // 渲染目標卡片
   const renderItem = ({ item }) => (
     <TouchableOpacity
-      onPress={() => navigation.navigate('GoalDetail', { goalId: item.id })}
+      onPress={() => navigation.navigate('GoalDetail', { goalId: item.id })} // 點擊進入詳情頁
       activeOpacity={0.7}
     >
       <View style={styles.card}>
+        {/* 左側：目標標題與進度 */}
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{item.title}</Text>
           <Text style={styles.meta}>
             Progress: {calcProgress(item)}% • ETA: {item.etaDays} days
           </Text>
         </View>
+        {/* 右側：編輯與刪除按鈕 */}
         <View style={styles.actions}>
           <TouchableOpacity onPress={() => openEdit(item)} style={styles.actionBtn}>
             <Text style={styles.actionTxt}>Edit</Text>
@@ -87,7 +102,10 @@ export default function MainScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      {/* 新增目標按鈕 */}
       <Button title="+ Add Goal" onPress={openAdd} />
+
+      {/* 目標清單 */}
       <FlatList
         data={goals}
         keyExtractor={(item) => item.id}
@@ -96,6 +114,7 @@ export default function MainScreen({ navigation }) {
         ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 20 }}>尚無目標</Text>}
       />
 
+      {/* 新增/編輯目標的彈窗表單 */}
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
@@ -113,6 +132,7 @@ export default function MainScreen({ navigation }) {
   );
 }
 
+// 樣式設定
 const styles = StyleSheet.create({
   container: { padding: 16, flex: 1 },
   card: { padding: 14, backgroundColor: '#fff', borderRadius: 12, marginBottom: 10, elevation: 1, flexDirection: 'row', gap: 10 },
