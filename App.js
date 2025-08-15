@@ -10,8 +10,8 @@ import { GoalsProvider } from './contexts/GoalsContext';
 import MainScreen from './screens/MainScreen';
 import ReportsScreen from './screens/ReportsScreen';
 import SocialScreen from './screens/SocialScreen';
-import SettingsScreen from './screens/SettingsScreen';
 import GoalDetailScreen from './screens/GoalDetailScreen';
+import SettingsStackNavigator from './navigation/SettingsStackNavigator';
 
 // 建立 Tab Navigator 與 Stack Navigator 實例
 const Tab = createBottomTabNavigator();
@@ -24,7 +24,7 @@ function Tabs() {
       <Tab.Screen name="Main" component={MainScreen} options={{ title: 'Dashboard' }} />
       <Tab.Screen name="Reports" component={ReportsScreen} />
       <Tab.Screen name="Social" component={SocialScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen name="Settings" component={SettingsStackNavigator} options={{ headerShown: false }} />
     </Tab.Navigator>
   );
 }

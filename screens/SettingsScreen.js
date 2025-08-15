@@ -1,46 +1,43 @@
-// App.js
-import * as React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+// screens/SettingsScreen.js
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 
-import { GoalsProvider } from './contexts/GoalsContext';
+const settingsOptions = [
+  { id: 'EditProfile', title: 'Edit Profile' },
+  { id: 'ChangePassword', title: 'Change Password' },
+  { id: 'NotificationSettings', title: 'Notification Settings' },
+  { id: 'PrivacySettings', title: 'Privacy Settings' },
+  { id: 'LanguageSettings', title: 'Language Settings' },
+  { id: 'About', title: 'About' },
+];
 
-import MainScreen from './screens/MainScreen';
-import ReportsScreen from './screens/ReportsScreen';
-import SocialScreen from './screens/SocialScreen';
-import GoalDetailScreen from './screens/GoalDetailScreen';
-import SettingsStackNavigator from './navigation/SettingsStackNavigator';
+export default function SettingsScreen({ navigation }) {
+  const renderItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.item}
+      onPress={() => navigation.navigate(item.id)}
+    >
+      <Text style={styles.itemText}>{item.title}</Text>
+    </TouchableOpacity>
+  );
 
-const Tab = createBottomTabNavigator();
-const Stack = createNativeStackNavigator();
-
-function Tabs() {
   return (
-    <Tab.Navigator screenOptions={{ headerTitleAlign: 'center' }}>
-      <Tab.Screen name="Main" component={MainScreen} options={{ title: 'Dashboard' }} />
-      <Tab.Screen name="Reports" component={ReportsScreen} />
-      <Tab.Screen name="Social" component={SocialScreen} />
-      <Tab.Screen name="Settings" component={SettingsStackNavigator} options={{ headerShown: false }} />
-    </Tab.Navigator>
+    <View style={styles.container}>
+      <FlatList
+        data={settingsOptions}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+      />
+    </View>
   );
 }
 
-function RootNavigator() {
-  return (
-    <Stack.Navigator>
-      <Stack.Screen name="RootTabs" component={Tabs} options={{ headerShown: false }} />
-      <Stack.Screen name="GoalDetail" component={GoalDetailScreen} options={{ title: 'Goal' }} />
-    </Stack.Navigator>
-  );
-}
-
-export default function App() {
-  return (
-    <GoalsProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
-    </GoalsProvider>
-  );
-}
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#fff' },
+  item: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  itemText: { fontSize: 16 },
+});
