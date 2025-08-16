@@ -9,15 +9,35 @@ import { useGoals, calcProgress } from '../contexts/GoalsContext';
 
 // 主頁面組件
 export default function MainScreen({ navigation }) {
-   // 從 GoalsContext 中取得目標列表與操作方法
+  // 從 GoalsContext 中取得目標列表與操作方法
   const { goals, addGoal, removeGoal, updateGoal } = useGoals();
 
   // 本地狀態：控制新增/編輯目標的彈窗
   const [modalVisible, setModalVisible] = useState(false);
-  const [mode, setMode] = useState('add'); // 'add' | 'edit'
+  const [mode, setMode] = useState('add'); // 'add' 或 'edit'
   const [editingId, setEditingId] = useState(null);
   const [title, setTitle] = useState('');
   const [etaDays, setEtaDays] = useState('');
+  const [saving, setSaving] = useState(false); // 存檔中狀態（用於按鈕 loading/禁用）
+
+  // 假 AI：根據 goal title 產生 3~4 個子目標（之後可直接換成呼叫後端 / OpenAI）
+  async function fakeAIBreakdown(goalTitle) {
+    const base = [
+      `Research plan for "${goalTitle}"`,
+      'Define weekly milestones',
+      'Schedule review sessions',
+      'Prepare resources / materials',
+      'Set up progress tracking routine',
+    ];
+    const count = 3 + Math.floor(Math.random() * 2); // 3~4 個
+    const now = Date.now();
+    return Array.from({ length: count }).map((_, i) => ({
+      id: `${now}-${i + 1}`,
+      title: base[i],
+      isDone: false,
+      order: i + 1,
+    }));
+  }
 
   // 開啟「新增目標」模式
   const openAdd = () => {
@@ -32,24 +52,30 @@ export default function MainScreen({ navigation }) {
   };
 
   // 儲存目標（新增或更新）
-  const saveGoal = () => {
+  const saveGoal = async () => {
     const trimmed = title.trim();
     if (!trimmed) {
       if (Platform.OS === 'web') alert('請輸入目標名稱'); else Alert.alert('請輸入目標名稱');
       return;
     }
-     // 處理 ETA 天數（允許留空）
+    // 處理 ETA 天數（允許留空）
     const eta = etaDays === '' ? undefined : Math.max(0, parseInt(etaDays, 10) || 0);
 
     if (mode === 'add') {
-       // 新增目標
-      const newGoal = {
-        id: String(Date.now()), // 用時間戳當 ID
-        title: trimmed,
-        etaDays: eta ?? 30, // 預設 30 天
-        subgoals: [], // Phase 2: 先空陣列；之後 Phase 3 用 AI 產生
-      };
-      addGoal(newGoal);
+      try {
+        setSaving(true);
+        // Phase 3：用「假 AI」產生 subgoals（之後可替換為 fetch 後端）
+        const subgoals = await fakeAIBreakdown(trimmed);
+        const newGoal = {
+          id: String(Date.now()), // 用時間戳當 ID
+          title: trimmed,
+          etaDays: eta ?? 30,     // 預設 30 天
+          subgoals,               // 放進 AI 產生的子目標
+        };
+        addGoal(newGoal);
+      } finally {
+        setSaving(false);
+      }
     } else if (mode === 'edit' && editingId) {
       // 更新目標
       updateGoal(editingId, (g) => ({ ...g, title: trimmed, etaDays: eta ?? g.etaDays }));
@@ -119,11 +145,22 @@ export default function MainScreen({ navigation }) {
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>{mode === 'add' ? 'New Goal' : 'Edit Goal'}</Text>
-            <TextInput placeholder="Goal title" value={title} onChangeText={setTitle} style={styles.input} />
-            <TextInput placeholder="ETA (days)" value={etaDays} onChangeText={setEtaDays} keyboardType="number-pad" style={styles.input} />
+            <TextInput
+              placeholder="Goal title"
+              value={title}
+              onChangeText={setTitle}
+              style={styles.input}
+            />
+            <TextInput
+              placeholder="ETA (days)"
+              value={etaDays}
+              onChangeText={setEtaDays}
+              keyboardType="number-pad"
+              style={styles.input}
+            />
             <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
               <Button title="Cancel" onPress={() => setModalVisible(false)} />
-              <Button title="Save" onPress={saveGoal} />
+              <Button title={saving ? 'Saving...' : 'Save'} onPress={saveGoal} disabled={saving} />
             </View>
           </View>
         </View>
@@ -135,7 +172,15 @@ export default function MainScreen({ navigation }) {
 // 樣式設定
 const styles = StyleSheet.create({
   container: { padding: 16, flex: 1 },
-  card: { padding: 14, backgroundColor: '#fff', borderRadius: 12, marginBottom: 10, elevation: 1, flexDirection: 'row', gap: 10 },
+  card: {
+    padding: 14,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 10,
+    elevation: 1,
+    flexDirection: 'row',
+    gap: 10
+  },
   title: { fontSize: 16, fontWeight: '600' },
   meta: { marginTop: 6, color: '#666' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
