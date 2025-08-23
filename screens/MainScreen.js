@@ -7,6 +7,36 @@ import {
 } from 'react-native';
 import { useGoals, calcProgress } from '../contexts/GoalsContext';
 
+// ==== 雲端 function URL（你的 project-ref 已恢復：baygppmzqzisddezwyrs）====
+const FUNC_URL = 'https://baygppmzqzisddezwyrs.functions.supabase.co/breakdown';
+
+// 如果未來你把雲端 function 打開 JWT 驗證（沒用 --no-verify-jwt），把 NEED_AUTH 改為 true，並帶上 anon key。
+const NEED_AUTH = false; // 目前我們不需要驗證
+const ANON_KEY = '<your-anon-key-if-needed>'; // 需要驗證時才填
+
+// 用雲端 function 產生子目標（之後要換成真 AI 也只要改後端即可） 
+async function realAIBreakdown(goalTitle, etaDays) {
+  const res = await fetch(FUNC_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(NEED_AUTH ? { Authorization: `Bearer ${ANON_KEY}` } : {}),
+    },
+    body: JSON.stringify({ title: goalTitle, etaDays }),
+  });
+
+  if (!res.ok) {
+    // Fallback：失敗時也能繼續開發
+    const now = Date.now();
+    return [
+      { id: `${now}-1`, title: `Plan for "${goalTitle}"`, isDone: false, order: 1 },
+      { id: `${now}-2`, title: 'Weekly schedule', isDone: false, order: 2 },
+      { id: `${now}-3`, title: 'First milestone', isDone: false, order: 3 },
+    ];
+  }
+  return res.json();
+}
+
 // 主頁面組件
 export default function MainScreen({ navigation }) {
   // 從 GoalsContext 中取得目標列表與操作方法
@@ -21,6 +51,7 @@ export default function MainScreen({ navigation }) {
   const [saving, setSaving] = useState(false); // 存檔中狀態（用於按鈕 loading/禁用）
 
   // 假 AI：根據 goal title 產生 3~4 個子目標（之後可直接換成呼叫後端 / OpenAI）
+  // （保留你的註解，但實作改用雲端 function；真的要回退本地假資料，只要改 saveGoal 裡的呼叫即可）
   async function fakeAIBreakdown(goalTitle) {
     const base = [
       `Research plan for "${goalTitle}"`,
@@ -65,12 +96,14 @@ export default function MainScreen({ navigation }) {
       try {
         setSaving(true);
         // Phase 3：用「假 AI」產生 subgoals（之後可替換為 fetch 後端）
-        const subgoals = await fakeAIBreakdown(trimmed);
+        // ⚠️ 改為呼叫雲端 function：如要回退本地假資料，將下一行改回 fakeAIBreakdown(trimmed)
+        const subgoals = await realAIBreakdown(trimmed, eta);
+
         const newGoal = {
           id: String(Date.now()), // 用時間戳當 ID
           title: trimmed,
           etaDays: eta ?? 30,     // 預設 30 天
-          subgoals,               // 放進 AI 產生的子目標
+          subgoals,               // 放進 AI 產生的子目標（來自雲端 function）
         };
         addGoal(newGoal);
       } finally {
