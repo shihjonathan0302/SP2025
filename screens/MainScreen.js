@@ -7,6 +7,10 @@ import {
 } from 'react-native';
 import { useGoals, calcProgress } from '../contexts/GoalsContext';
 
+// ADD: 連 Supabase 與 DB 服務層
+import { supabase } from '../supabaseClient';
+import * as db from '../services/db';
+
 // ==== 雲端 function URL（你的 project-ref 已恢復：baygppmzqzisddezwyrs）====
 const FUNC_URL = 'https://baygppmzqzisddezwyrs.functions.supabase.co/breakdown';
 
@@ -50,8 +54,7 @@ export default function MainScreen({ navigation }) {
   const [etaDays, setEtaDays] = useState('');
   const [saving, setSaving] = useState(false); // 存檔中狀態（用於按鈕 loading/禁用）
 
-  // 假 AI：根據 goal title 產生 3~4 個子目標（之後可直接換成呼叫後端 / OpenAI）
-  // （保留你的註解，但實作改用雲端 function；真的要回退本地假資料，只要改 saveGoal 裡的呼叫即可）
+  // 假 AI（保留你的註解）
   async function fakeAIBreakdown(goalTitle) {
     const base = [
       `Research plan for "${goalTitle}"`,
@@ -95,22 +98,33 @@ export default function MainScreen({ navigation }) {
     if (mode === 'add') {
       try {
         setSaving(true);
+
+        // ADD: 取得目前登入 user（RLS 需要）
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          if (Platform.OS === 'web') alert('尚未登入'); else Alert.alert('尚未登入');
+          return;
+        }
+
         // Phase 3：用「假 AI」產生 subgoals（之後可替換為 fetch 後端）
         // ⚠️ 改為呼叫雲端 function：如要回退本地假資料，將下一行改回 fakeAIBreakdown(trimmed)
         const subgoals = await realAIBreakdown(trimmed, eta);
 
-        const newGoal = {
-          id: String(Date.now()), // 用時間戳當 ID
-          title: trimmed,
-          etaDays: eta ?? 30,     // 預設 30 天
-          subgoals,               // 放進 AI 產生的子目標（來自雲端 function）
-        };
-        addGoal(newGoal);
+        // ADD: 先建立 DB goal（回傳含有 uuid 的新 row）
+        const g = await db.createGoal(user.id, trimmed, eta ?? 30);
+
+        // ADD: 寫入 subgoals 到 DB
+        await db.insertSubgoals(g.id, subgoals);
+
+        // ADD: 更新前端 state（用 DB 的 id）
+        addGoal({ ...g, subgoals });
       } finally {
         setSaving(false);
       }
     } else if (mode === 'edit' && editingId) {
-      // 更新目標
+      // ADD: 先更新 DB
+      await db.updateGoal(editingId, { title: trimmed, eta_days: eta });
+      // 更新畫面
       updateGoal(editingId, (g) => ({ ...g, title: trimmed, etaDays: eta ?? g.etaDays }));
     }
 
@@ -119,15 +133,21 @@ export default function MainScreen({ navigation }) {
   };
 
   // 刪除目標
-  const deleteGoal = (id) => {
+  const deleteGoal = async (id) => {
+    const doDelete = async () => {
+      // ADD: 刪 DB（subgoals 會因 FK on delete cascade 一併刪）
+      await db.deleteGoal(id);
+      // 更新畫面
+      removeGoal(id);
+    };
+
     if (Platform.OS === 'web') {
       const ok = window.confirm?.('確定要刪除這個目標嗎？');
-      if (!ok) return;
-      removeGoal(id);
+      if (ok) await doDelete();
     } else {
       Alert.alert('刪除目標', '確定要刪除嗎？', [
         { text: '取消' },
-        { text: '刪除', style: 'destructive', onPress: () => removeGoal(id) },
+        { text: '刪除', style: 'destructive', onPress: () => doDelete() },
       ]);
     }
   };

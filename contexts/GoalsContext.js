@@ -1,34 +1,23 @@
 // contexts/GoalsContext.js
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// REMOVE: 不再用本機持久化（避免跟雲端打架）
+// import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// 本機儲存的 key
-const STORAGE_KEY = 'GOALS_V1';
+// 本機儲存的 key（保留註解，但不使用）
+// const STORAGE_KEY = 'GOALS_V1';
+
+// ADD: 連 Supabase 與你的 DB 服務層
+import { supabase } from '../supabaseClient';
+import * as db from '../services/db';
 
 // 建立 Context
 const GoalsContext = createContext(null);
 
 // Provider：包住 App，提供 goals 狀態與操作方法
 export function GoalsProvider({ children }) {
-  // 初始資料（讀取失敗時作為預設）
-  const [goals, setGoals] = useState([
-    {
-      id: '1',
-      title: 'Learn JavaScript',
-      etaDays: 30,
-      subgoals: [
-        { id: '1-1', title: 'Finish a JS basics tutorial', isDone: false, order: 1 },
-        { id: '1-2', title: 'Build a small todo app', isDone: true, order: 2 },
-      ],
-    },
-    {
-      id: '2',
-      title: 'Pass TOEFL',
-      etaDays: 120,
-      subgoals: [{ id: '2-1', title: 'Diagnostic test', isDone: false, order: 1 }],
-    },
-  ]);
+  // CHANGE: 初始改成空陣列，資料來源改為 DB
+  const [goals, setGoals] = useState([]);
 
   // 小遷移：確保每個 goal 都有 subgoals 陣列（避免舊資料沒有這欄位）
   const migrateGoals = (arr) =>
@@ -39,31 +28,38 @@ export function GoalsProvider({ children }) {
         }))
       : [];
 
-  // 開機讀：若有本機資料就覆蓋初始值（並做遷移）
+  // ADD: 開機載入 + 監聽 auth 切換後重新載入（完全由雲端 DB 讀）
   useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          setGoals(migrateGoals(parsed));
-        }
-      } catch (e) {
-        console.warn('Load storage failed', e);
-        // 失敗就維持初始 goals，不中斷
+    const loadFromDb = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setGoals([]);
+        return;
       }
-    })();
+      const rows = await db.listGoals(user.id); // 你在 services/db.js 實作
+      setGoals(migrateGoals(rows));
+    };
+
+    // 第一次載入
+    loadFromDb();
+
+    // 登入/登出切換時重載
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (!session?.user) setGoals([]);
+      else loadFromDb();
+    });
+    return () => sub.subscription?.unsubscribe?.();
   }, []);
 
-  // 變更即寫：goals 每次改動都寫回本機
-  useEffect(() => {
-    if (!goals) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(goals)).catch((e) =>
-      console.warn('Save storage failed', e)
-    );
-  }, [goals]);
+  // REMOVE: 不再做本機持久化
+  // useEffect(() => {
+  //   if (!goals) return;
+  //   AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(goals)).catch((e) =>
+  //     console.warn('Save storage failed', e)
+  //   );
+  // }, [goals]);
 
-  // 共享操作
+  // 共享操作（前端 state 更新仍保留給畫面即時回饋）
   const addGoal = (goal) => setGoals((prev) => [goal, ...prev]);
   const removeGoal = (goalId) => setGoals((prev) => prev.filter((g) => g.id !== goalId));
   const updateGoal = (goalId, updater) =>

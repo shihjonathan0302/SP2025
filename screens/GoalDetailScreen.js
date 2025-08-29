@@ -6,6 +6,9 @@ import {
 } from 'react-native';
 import { useGoals } from '../contexts/GoalsContext';
 
+// ADD: DB 服務層
+import * as db from '../services/db';
+
 export default function GoalDetailScreen({ route }) {
   const { goalId } = route.params || {};
   const { goals, updateGoal } = useGoals();
@@ -23,15 +26,22 @@ export default function GoalDetailScreen({ route }) {
     );
   }
 
-  const addSubgoal = () => {
+  // CHANGE: 新增子目標 → 先寫 DB，再更新前端 state
+  const addSubgoal = async () => {
     const t = newTitle.trim();
     if (!t) return;
+
+    // 建議由 DB 產出 id（uuid），這裡回傳 created row
+    const order = (goal.subgoals?.length || 0) + 1;
+    const created = await db.createSubgoal(goal.id, t, order);
+
     const sg = {
-      id: `${Date.now()}`,
+      id: created.id,
       title: t,
       isDone: false,
-      order: (goal.subgoals?.length || 0) + 1,
+      order
     };
+
     updateGoal(goal.id, (g) => ({
       ...g,
       subgoals: [...(g.subgoals || []), sg],
@@ -39,26 +49,31 @@ export default function GoalDetailScreen({ route }) {
     setNewTitle('');
   };
 
-  const toggleSubgoal = (sid, isDone) => {
+  // CHANGE: 切換完成 → 打 DB
+  const toggleSubgoal = async (sid, isDone) => {
+    await db.updateSubgoal(sid, { is_done: isDone });
     updateGoal(goal.id, (g) => ({
       ...g,
       subgoals: (g.subgoals || []).map((s) => (s.id === sid ? { ...s, isDone } : s)),
     }));
   };
 
-  const deleteSubgoal = (sid) => {
-    const go = () =>
+  // CHANGE: 刪除子目標 → 打 DB
+  const deleteSubgoal = async (sid) => {
+    const go = async () => {
+      await db.deleteSubgoal(sid);
       updateGoal(goal.id, (g) => ({
         ...g,
         subgoals: (g.subgoals || []).filter((s) => s.id !== sid),
       }));
+    };
 
     if (Platform.OS === 'web') {
-      if (window.confirm?.('確定要刪除此子目標嗎？')) go();
+      if (window.confirm?.('確定要刪除此子目標嗎？')) await go();
     } else {
       Alert.alert('刪除子目標', '確定要刪除嗎？', [
         { text: '取消' },
-        { text: '刪除', style: 'destructive', onPress: go },
+        { text: '刪除', style: 'destructive', onPress: () => { go(); } },
       ]);
     }
   };
