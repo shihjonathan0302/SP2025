@@ -9,10 +9,10 @@ import { GoalsProvider } from './contexts/GoalsContext';
 
 // 匯入各個螢幕組件（對應不同頁面）
 import MainScreen from './screens/MainScreen';
-import ReportsScreen from './screens/ReportsScreen';
 import SocialScreen from './screens/SocialScreen';
 import GoalDetailScreen from './screens/GoalDetailScreen';
 import SettingsStackNavigator from './navigation/SettingsStackNavigator';
+import ReportsStackNavigator from './navigation/ReportsStackNavigator';
 
 // ADD: 匯入 Supabase client 與 Login 螢幕
 import { supabase } from './supabaseClient';
@@ -27,7 +27,10 @@ function Tabs() {
   return (
     <Tab.Navigator screenOptions={{ headerTitleAlign: 'center' }}>
       <Tab.Screen name="Main" component={MainScreen} options={{ title: 'Dashboard' }} />
-      <Tab.Screen name="Reports" component={ReportsScreen} />
+      <Tab.Screen 
+        name="Reports" 
+        component={ReportsStackNavigator} 
+        options={{ headerShown: false }}/>
       <Tab.Screen name="Social" component={SocialScreen} />
       {/* Settings 我保留你原本用的 Stack Navigator */}
       <Tab.Screen
