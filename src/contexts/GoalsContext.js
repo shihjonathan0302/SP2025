@@ -8,7 +8,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 // const STORAGE_KEY = 'GOALS_V1';
 
 // ADD: 連 Supabase 與你的 DB 服務層
-import { supabase } from '../supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 import * as db from '../services/db';
 
 // 建立 Context

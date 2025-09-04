@@ -5,18 +5,20 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import { GoalsProvider } from './contexts/GoalsContext';
+// ⬇️ 路徑改到 src/ 底下
+import { GoalsProvider } from './src/contexts/GoalsContext';
 
 // 匯入各個螢幕組件（對應不同頁面）
-import MainScreen from './screens/MainScreen';
-import SocialScreen from './screens/SocialScreen';
-import GoalDetailScreen from './screens/GoalDetailScreen';
-import SettingsStackNavigator from './navigation/SettingsStackNavigator';
-import ReportsStackNavigator from './navigation/ReportsStackNavigator';
+import MainScreen from './src/screens/MainScreen';
+import SocialScreen from './src/screens/SocialScreen';
+import GoalDetailScreen from './src/screens/GoalDetailScreen';
+import SettingsStackNavigator from './src/navigation/SettingsStackNavigator';
+import ReportsStackNavigator from './src/navigation/ReportsStackNavigator';
 
-// ADD: 匯入 Supabase client 與 Login 螢幕
-import { supabase } from './supabaseClient';
-import LoginScreen from './screens/LoginScreen';
+// ADD: 匯入 Supabase client 與 Login 螢幕（也都放在 src/）
+import { supabase } from './src/lib/supabaseClient';
+import LoginScreen from './src/screens/LoginScreen';
+
 
 // 建立 Tab Navigator 與 Stack Navigator 實例
 const Tab = createBottomTabNavigator();

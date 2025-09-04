@@ -1,7 +1,7 @@
 // screens/LoginScreen.js
 import React, { useState } from 'react'
 import { View, Text, TextInput, Button, Alert, StyleSheet } from 'react-native'
-import { supabase } from '../supabaseClient'
+import { supabase } from '../lib/supabaseClient'
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')

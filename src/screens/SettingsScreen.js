@@ -2,7 +2,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, Platform } from 'react-native';
 // ADD: 匯入 supabase client
-import { supabase } from '../supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 
 // 原有選項
 const settingsOptions = [

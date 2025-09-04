@@ -8,7 +8,7 @@ import {
 import { useGoals, calcProgress } from '../contexts/GoalsContext';
 
 // ADD: 連 Supabase 與 DB 服務層
-import { supabase } from '../supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 import * as db from '../services/db';
 
 // ==== 雲端 function URL（你的 project-ref 已恢復：baygppmzqzisddezwyrs）====

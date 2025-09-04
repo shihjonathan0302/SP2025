@@ -1,5 +1,5 @@
 // services/db.js
-import { supabase } from '../supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 
 /**
  * 取得目前登入的使用者 ID（JWT 內的 auth.uid）
@@ -237,7 +237,7 @@ function normalizeSubgoalRow(s) {
   };
 }
 
-/* -------------------------------------------------------
+/* ------------------------------------------------------- 
  * 兼容出口（保留你原本名字，避免其他檔案已經引用）
  * -----------------------------------------------------*/
 
