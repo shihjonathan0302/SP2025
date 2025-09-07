@@ -1,4 +1,4 @@
-// services/db.js
+// src/services/db.js
 import { supabase } from '../lib/supabaseClient';
 
 /**
@@ -14,7 +14,7 @@ export async function getUserId() {
  * GOALS（目標）
  * -----------------------------------------------------*/
 
-// 你原本的：建立一個 goal（只建 Goal，不建 Subgoals）
+// 建立一個 goal（物件參數版，保留）
 export async function createGoalObjectArg({ title, etaDays }) {
   const userId = await getUserId();
   if (!userId) throw new Error('Not signed in');
@@ -29,7 +29,7 @@ export async function createGoalObjectArg({ title, etaDays }) {
   return normalizeGoalRow(data);
 }
 
-// ✅ 新增別名：createGoal(userId, title, etaDays) 以符合前端呼叫
+// ✅ 別名：createGoal(userId?, title, etaDays?)
 export async function createGoal(userIdOrUndefined, title, etaDays) {
   const userId = userIdOrUndefined ?? (await getUserId());
   if (!userId) throw new Error('Not signed in');
@@ -44,7 +44,7 @@ export async function createGoal(userIdOrUndefined, title, etaDays) {
   return normalizeGoalRow(data);
 }
 
-// 你原本的：列出 goals（不含 subgoals）
+// 讀 goals（不含 subgoals）
 export async function listGoalsBare() {
   const userId = await getUserId();
   if (!userId) throw new Error('Not signed in');
@@ -59,7 +59,7 @@ export async function listGoalsBare() {
   return (data ?? []).map(normalizeGoalRow);
 }
 
-// ✅ 取 goals + subgoals（給 Context 啟動時一次載入）
+// ✅ 讀 goals + subgoals（給 Context 一次載入）
 export async function listGoals() {
   const goals = await listGoalsBare();
   const withSubs = await Promise.all(
@@ -71,7 +71,7 @@ export async function listGoals() {
   return withSubs;
 }
 
-// 你原本的：更新某個 goal（欄位名用物件）
+// 更新某個 goal（欄位名用物件）
 export async function updateGoalFields(goalId, { title, etaDays }) {
   const patch = {};
   if (typeof title === 'string') patch.title = title;
@@ -88,9 +88,8 @@ export async function updateGoalFields(goalId, { title, etaDays }) {
   return normalizeGoalRow(data);
 }
 
-// ✅ 新增別名：updateGoal(goalId, patch)（對齊前端呼叫）
+// ✅ 別名：updateGoal(goalId, patch)（支援 { eta_days } 或 { etaDays }）
 export async function updateGoal(goalId, patch) {
-  // 允許傳 { title, eta_days } 或 { title, etaDays }
   const normalized = {};
   if (typeof patch?.title === 'string') normalized.title = patch.title;
   if (typeof patch?.eta_days !== 'undefined') normalized.eta_days = patch.eta_days;
@@ -107,14 +106,14 @@ export async function updateGoal(goalId, patch) {
   return normalizeGoalRow(data);
 }
 
-// 你原本的：刪除 goal
+// 刪除 goal（FK on delete cascade 會連 subgoals 一併刪）
 export async function removeGoalById(goalId) {
   const { error } = await supabase.from('goals').delete().eq('id', goalId);
   if (error) throw error;
   return true;
 }
 
-// ✅ 新增別名：deleteGoal(goalId)（對齊前端呼叫）
+// ✅ 別名：deleteGoal(goalId)
 export async function deleteGoal(goalId) {
   return removeGoalById(goalId);
 }
@@ -135,7 +134,7 @@ export async function listSubgoals(goalId) {
   return (data ?? []).map(normalizeSubgoalRow);
 }
 
-// 批次新增 subgoals（你原本就有）
+// 批次新增 subgoals
 export async function insertSubgoals(goalId, items /* [{title,isDone,order}] */) {
   const rows = (items ?? []).map((it) => ({
     goal_id: goalId,
@@ -155,7 +154,7 @@ export async function insertSubgoals(goalId, items /* [{title,isDone,order}] */)
   return (data ?? []).map(normalizeSubgoalRow);
 }
 
-// ✅ 新增：建立單一 subgoal
+// 建立單一 subgoal
 export async function createSubgoal(goalId, title, order = 1) {
   const { data, error } = await supabase
     .from('subgoals')
@@ -167,7 +166,7 @@ export async function createSubgoal(goalId, title, order = 1) {
   return normalizeSubgoalRow(data);
 }
 
-// 你原本的：切換子目標完成狀態
+// 切換子目標完成狀態
 export async function toggleSubgoalDone(subgoalId, isDone) {
   const { data, error } = await supabase
     .from('subgoals')
@@ -180,7 +179,7 @@ export async function toggleSubgoalDone(subgoalId, isDone) {
   return normalizeSubgoalRow(data);
 }
 
-// ✅ 新增：通用更新（可更新 title / is_done / order）
+// 通用更新（可更新 title / is_done / order）
 export async function updateSubgoal(subgoalId, patch /* { title?, is_done?, order? } */) {
   const payload = {};
   if (typeof patch?.title === 'string') payload.title = patch.title;
@@ -198,14 +197,14 @@ export async function updateSubgoal(subgoalId, patch /* { title?, is_done?, orde
   return normalizeSubgoalRow(data);
 }
 
-// 你原本的：刪除子目標
+// 刪除子目標
 export async function removeSubgoal(subgoalId) {
   const { error } = await supabase.from('subgoals').delete().eq('id', subgoalId);
   if (error) throw error;
   return true;
 }
 
-// ✅ 新增別名：deleteSubgoal(id)（對齊前端呼叫）
+// 別名：deleteSubgoal(id)
 export async function deleteSubgoal(subgoalId) {
   return removeSubgoal(subgoalId);
 }
@@ -241,7 +240,6 @@ function normalizeSubgoalRow(s) {
  * 兼容出口（保留你原本名字，避免其他檔案已經引用）
  * -----------------------------------------------------*/
 
-// 舊名別名保留（如果有人 import 這些名字）
 export {
   createGoalObjectArg as createGoalWithObjectArg,
   listGoalsBare as listGoalsWithoutSubgoals,

@@ -100,7 +100,9 @@ export default function MainScreen({ navigation }) {
         setSaving(true);
 
         // ADD: 取得目前登入 user（RLS 需要）
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        const user = data?.user;
         if (!user) {
           if (Platform.OS === 'web') alert('尚未登入'); else Alert.alert('尚未登入');
           return;
@@ -118,14 +120,22 @@ export default function MainScreen({ navigation }) {
 
         // ADD: 更新前端 state（用 DB 的 id）
         addGoal({ ...g, subgoals });
+      } catch (e) {
+        console.log('[saveGoal:add] error', e);
+        if (Platform.OS === 'web') alert(String(e)); else Alert.alert('錯誤', String(e));
       } finally {
         setSaving(false);
       }
     } else if (mode === 'edit' && editingId) {
-      // ADD: 先更新 DB
-      await db.updateGoal(editingId, { title: trimmed, eta_days: eta });
-      // 更新畫面
-      updateGoal(editingId, (g) => ({ ...g, title: trimmed, etaDays: eta ?? g.etaDays }));
+      try {
+        // ADD: 先更新 DB
+        await db.updateGoal(editingId, { title: trimmed, eta_days: eta });
+        // 更新畫面
+        updateGoal(editingId, (g) => ({ ...g, title: trimmed, etaDays: eta ?? g.etaDays }));
+      } catch (e) {
+        console.log('[saveGoal:edit] error', e);
+        if (Platform.OS === 'web') alert(String(e)); else Alert.alert('錯誤', String(e));
+      }
     }
 
     // 關閉 modal 並重置表單
@@ -135,10 +145,15 @@ export default function MainScreen({ navigation }) {
   // 刪除目標
   const deleteGoal = async (id) => {
     const doDelete = async () => {
-      // ADD: 刪 DB（subgoals 會因 FK on delete cascade 一併刪）
-      await db.deleteGoal(id);
-      // 更新畫面
-      removeGoal(id);
+      try {
+        // ADD: 刪 DB（subgoals 會因 FK on delete cascade 一併刪）
+        await db.deleteGoal(id);
+        // 更新畫面
+        removeGoal(id);
+      } catch (e) {
+        console.log('[deleteGoal] error', e);
+        if (Platform.OS === 'web') alert(String(e)); else Alert.alert('刪除失敗', String(e));
+      }
     };
 
     if (Platform.OS === 'web') {
