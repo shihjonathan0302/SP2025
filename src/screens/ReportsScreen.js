@@ -22,7 +22,7 @@ export default function ReportsScreen({ navigation }) {
           <View style={styles.divider} /> 
 
           <View style={styles.cardsRow}>
-            {/* Total Goals：可點 */}
+            {/* Total Goals */}
             <Pressable
               style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
               onPress={() => navigation.navigate('TotalGoals', { totalGoals })}
@@ -31,21 +31,33 @@ export default function ReportsScreen({ navigation }) {
               <Text style={styles.cardValue}>{totalGoals}</Text>
             </Pressable>
 
-            <View style={styles.card}>
+            {/* Completed Goals */}
+            <Pressable
+              style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
+              onPress={() => navigation.navigate('CompletedGoals', { completedGoals })}
+            >
               <Text style={styles.cardLabel}>Completed Goals</Text>
               <Text style={styles.cardValue}>{completedGoals}</Text>
-            </View>
+            </Pressable>
 
-            <View style={styles.card}>
+            {/* Pending Goals */}
+            <Pressable
+              style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
+              onPress={() => navigation.navigate('PendingGoals', { pendingGoals })}
+            >
               <Text style={styles.cardLabel}>Pending Goals</Text>
               <Text style={styles.cardValue}>{pendingGoals}</Text>
-            </View>
+            </Pressable>
 
-            <View style={styles.card}>
+            {/* Success Rate */}
+            <Pressable
+              style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
+              onPress={() => navigation.navigate('SuccessRate', { successRate })}
+            >
               <Text style={styles.cardLabel}>Success Rate</Text>
               <Text style={styles.cardValue}>{successRate}%</Text>
-            </View>
-          </View>
+            </Pressable>
+           </View> 
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Performance Overview</Text>
