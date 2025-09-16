@@ -1,288 +1,373 @@
 // src/screens/settings/EditProfileScreen.js
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, TextInput, StyleSheet, Image, Button, Alert, Platform, TouchableOpacity, ActivityIndicator,
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  Pressable,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Modal,
 } from 'react-native';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from '../../lib/supabaseClient';
 
+const AVATAR_SIZE = 160;
 const BUCKET = 'avatars';
 
 export default function EditProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // auth / profile
-  const [userId, setUserId] = useState(null);
-  const [email, setEmail] = useState('');
-
-  // profiles fields
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
 
-  // profile picture (storage 相對路徑 + 預覽 URL)
-  const [photoPath, setPhotoPath] = useState(null);
-  const [photoUrl, setPhotoUrl] = useState(null); // 可直接 <Image source={{uri:}}>
+  const [uid, setUid] = useState(null);
+  const [avatarPath, setAvatarPath] = useState(null); // storage path
+  const [avatarUrl, setAvatarUrl] = useState(null);   // public url
 
-  // ---------- 讀取資料 ----------
+  // Actions bottom sheet
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   useEffect(() => {
+    let alive = true;
     (async () => {
       try {
-        setLoading(true);
+        const { data: auth } = await supabase.auth.getUser();
+        const userId = auth?.user?.id ?? null;
+        if (!alive) return;
+        setUid(userId);
+        if (!userId) { setLoading(false); return; }
 
-        const { data: { user }, error: uerr } = await supabase.auth.getUser();
-        if (uerr) throw uerr;
-        if (!user?.id) throw new Error('Not signed in');
-        setUserId(user.id);
-        setEmail(user.email || '');
-
-        // 讀 profiles；沒有就先建立一筆空白
-        const { data: prof, error: perr, status } = await supabase
+        const { data, error } = await supabase
           .from('profiles')
-          .select('id, full_name, username, bio, avatar_url')
-          .eq('id', user.id)
-          .maybeSingle();
+          .select('full_name, username, bio, avatar_url')
+          .eq('id', userId)
+          .single();
 
-        if (perr && status !== 406) throw perr;
-
-        if (!prof) {
-          // 建立空白 row（避免後面 update 找不到）
-          const { error: ierr } = await supabase
-            .from('profiles')
-            .insert({ id: user.id, full_name: '', username: '', bio: '', avatar_url: null });
-          if (ierr) throw ierr;
-          setFullName('');
-          setUsername('');
-          setBio('');
-          setPhotoPath(null);
-          setPhotoUrl(null);
-        } else {
-          setFullName(prof.full_name || '');
-          setUsername(prof.username || '');
-          setBio(prof.bio || '');
-          setPhotoPath(prof.avatar_url || null);
-          if (prof.avatar_url) {
-            const url = buildPublicUrl(prof.avatar_url);
-            setPhotoUrl(url);
+        if (!error && data) {
+          setFullName(data.full_name ?? '');
+          setUsername(data.username ?? '');
+          setBio(data.bio ?? '');
+          if (data.avatar_url) {
+            setAvatarPath(data.avatar_url);
+            setAvatarUrl(publicUrl(data.avatar_url));
           }
         }
       } catch (e) {
-        console.log('[profile load error]', e);
-        Alert.alert('Load error', String(e?.message || e));
+        console.log('[profile load]', e);
       } finally {
         setLoading(false);
       }
     })();
+    return () => { alive = false; };
   }, []);
 
-  // ---------- 產生 public URL ----------
-  function buildPublicUrl(path) {
-    if (!path) return null;
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    // 加 time 防快取
-    return data?.publicUrl ? `${data.publicUrl}?t=${Date.now()}` : null;
-  }
+  const publicUrl = (path) =>
+    supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 
-  // ---------- 換大頭貼（Web & 原生皆可） ----------
-  const changeProfilePicture = async () => {
+  const avatarSource = useMemo(() => (avatarUrl ? { uri: avatarUrl } : null), [avatarUrl]);
+
+  const filePath = (ext) => {
+    const safe = ext === 'png' ? 'png' : 'jpg';
+    const id = uid || 'anon';
+    return `${id}/${Date.now()}.${safe}`;
+  };
+
+  /** 上傳：Web 用 blob；原生用 arrayBuffer */
+  const uploadUri = async (uri) => {
+    const ext = uri.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+    const path = filePath(ext);
+
+    if (Platform.OS === 'web') {
+      const res = await fetch(uri);
+      const blob = await res.blob();
+      const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+        contentType: blob.type || (ext === 'png' ? 'image/png' : 'image/jpeg'),
+        upsert: true,
+      });
+      if (error) throw error;
+    } else {
+      const res = await fetch(uri);
+      const buf = await res.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, {
+        contentType: ext === 'png' ? 'image/png' : 'image/jpeg',
+        upsert: true,
+      });
+      if (error) throw error;
+    }
+
+    const { error: up2 } = await supabase
+      .from('profiles')
+      .update({ avatar_url: path, updated_at: new Date().toISOString() })
+      .eq('id', uid);
+    if (up2) throw up2;
+
+    setAvatarPath(path);
+    setAvatarUrl(publicUrl(path));
+  };
+
+  /** 點 EDIT → 打開面板 */
+  const handleEditPress = () => setSheetOpen(true);
+
+  /** 裁切現有照片（自動置中裁成 1:1，無額外 UI） */
+  const onCropCurrent = async () => {
     try {
-      // Web：改用原生 <input type="file">，最穩
-      if (Platform.OS === 'web') {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.onchange = async () => {
-          const file = input.files?.[0];
-          if (!file) return;
-
-          const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-          const path = `${userId}/${Date.now()}.${ext}`;
-
-          setSaving(true);
-          const { error: upErr } = await supabase
-            .storage
-            .from(BUCKET)
-            .upload(path, file, { upsert: true, contentType: file.type || `image/${ext}` });
-          if (upErr) throw upErr;
-
-          const { error: dbErr } = await supabase
-            .from('profiles')
-            .update({ avatar_url: path, updated_at: new Date().toISOString() })
-            .eq('id', userId);
-          if (dbErr) throw dbErr;
-
-          setPhotoPath(path);
-          setPhotoUrl(buildPublicUrl(path));
-          Alert.alert('Profile Picture', 'Updated.');
-          setSaving(false);
-        };
-        input.click();
+      setSheetOpen(false);
+      if (!avatarUrl) {
+        Alert.alert('No photo', 'You have no profile photo to crop yet.');
         return;
       }
+      // 把 public URL 取回來做本地處理
+      const res = await fetch(avatarUrl, { cache: 'no-store' });
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
 
-      // 原生：用 expo-image-picker（相簿）
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (perm.status !== 'granted') {
-        Alert.alert('Permission required', 'Please allow photo library access.');
+      // 先讀一下尺寸（用 manipulator 取得 meta 不太方便，這裡直接「居中裁成 512x512」）
+      // 簡化：直接 resize 成 512 x 512（視覺上等同 1:1）
+      const square = await ImageManipulator.manipulateAsync(
+        blobUrl,
+        [{ resize: { width: 512, height: 512 } }],
+        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      await uploadUri(square.uri);
+    } catch (e) {
+      console.log('[crop current]', e);
+      Alert.alert('Failed', String(e?.message || e));
+    }
+  };
+
+  /** 選擇新照片（用系統裁切器 1:1） */
+  const onChooseNew = async () => {
+    try {
+      setSheetOpen(false);
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'We need media permission to select a photo.');
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaType.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.9,
+        quality: 1,
       });
       if (result.canceled) return;
-
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
 
-      const resp = await fetch(asset.uri);
-      const blob = await resp.blob();
-      const guessExt = (blob.type || '').includes('png')
-        ? 'png'
-        : (blob.type || '').includes('webp')
-        ? 'webp'
-        : 'jpg';
-      const path = `${userId}/${Date.now()}.${guessExt}`;
-
-      setSaving(true);
-      const { error: upErr } = await supabase
-        .storage
-        .from(BUCKET)
-        .upload(path, blob, { upsert: true, contentType: blob.type || `image/${guessExt}` });
-      if (upErr) throw upErr;
-
-      const { error: dbErr } = await supabase
-        .from('profiles')
-        .update({ avatar_url: path, updated_at: new Date().toISOString() })
-        .eq('id', userId);
-      if (dbErr) throw dbErr;
-
-      setPhotoPath(path);
-      setPhotoUrl(buildPublicUrl(path));
-      Alert.alert('Profile Picture', 'Updated.');
+      // 再保險縮成 512x512
+      const final = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 512, height: 512 } }],
+        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      await uploadUri(final.uri);
     } catch (e) {
-      console.log('[changeProfilePicture error]', e);
-      Alert.alert('Upload error', String(e?.message || e));
-    } finally {
-      setSaving(false);
+      console.log('[pick new]', e);
+      Alert.alert('Failed', String(e?.message || e));
     }
   };
 
-  // ---------- 儲存 profile 欄位 ----------
-  const saveProfile = async () => {
+  const handleSave = async () => {
+    if (!uid) return;
     try {
-      if (!userId) return;
-      if (!username.trim()) {
-        Alert.alert('Validation', 'Username is required.');
-        return;
-      }
       setSaving(true);
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: fullName.trim(),
-          username: username.trim(),
-          bio: bio.trim(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId);
+      const patch = {
+        full_name: fullName.trim(),
+        username: username.trim(),
+        bio: bio.trim(),
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await supabase.from('profiles').update(patch).eq('id', uid);
       if (error) throw error;
       Alert.alert('Saved', 'Profile updated.');
     } catch (e) {
-      console.log('[saveProfile error]', e);
-      const msg = String(e?.message || e);
-      if (/duplicate key|unique/i.test(msg)) {
-        Alert.alert('Save error', 'Username already taken.');
-      } else {
-        Alert.alert('Save error', msg);
-      }
+      Alert.alert('Error', String(e?.message || e));
     } finally {
       setSaving(false);
     }
   };
 
-  // ---------- UI ----------
   if (loading) {
     return (
-      <View style={[styles.container, styles.center]}>
+      <View style={styles.center}>
         <ActivityIndicator />
       </View>
     );
   }
 
-  const initial = (username || email || 'U').trim().charAt(0).toUpperCase();
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Edit Profile</Text>
-
-      {/* Profile Picture */}
-      <TouchableOpacity onPress={changeProfilePicture} activeOpacity={0.8}>
-        {photoUrl ? (
-          <Image source={{ uri: photoUrl }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Text style={styles.avatarTxt}>{initial}</Text>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Avatar + EDIT overlay */}
+        <Pressable onPress={handleEditPress} style={styles.avatarWrap}>
+          {avatarSource ? (
+            <Image source={avatarSource} style={styles.avatarImg} contentFit="cover" transition={200} />
+          ) : (
+            <View style={[styles.avatarImg, styles.avatarFallback]}>
+              <Text style={styles.avatarFallbackText}>?</Text>
+            </View>
+          )}
+          <View style={styles.editBar}>
+            <Text style={styles.editText}>EDIT</Text>
           </View>
-        )}
-      </TouchableOpacity>
-      <View style={{ height: 8 }} />
-      <Button title={saving ? 'Updating…' : 'Change Profile Picture'} onPress={changeProfilePicture} disabled={saving} />
+        </Pressable>
 
-      {/* Full name */}
-      <Text style={styles.label}>Full name</Text>
+        <View style={{ height: 24 }} />
+
+        <Field
+          label="Full name"
+          value={fullName}
+          placeholder="Your full name"
+          onChangeText={setFullName}
+        />
+        <Field
+          label="Username"
+          value={username}
+          placeholder="your_handle"
+          onChangeText={setUsername}
+          autoCapitalize="none"
+        />
+        <Field
+          label="Bio"
+          value={bio}
+          placeholder="Tell others about yourself…"
+          onChangeText={setBio}
+          multiline
+        />
+
+        <View style={{ height: 12 }} />
+        <Pressable style={styles.primaryBtn} onPress={handleSave} disabled={saving}>
+          <Text style={styles.primaryBtnText}>{saving ? 'Saving…' : 'Save changes'}</Text>
+        </Pressable>
+      </ScrollView>
+
+      {/* Bottom sheet（簡易） */}
+      <Modal transparent visible={sheetOpen} animationType="fade" onRequestClose={() => setSheetOpen(false)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setSheetOpen(false)}>
+          <View />
+        </Pressable>
+        <View style={styles.sheet}>
+          <Pressable style={styles.sheetBtn} onPress={onCropCurrent}>
+            <Text style={styles.sheetBtnText}>Crop current photo</Text>
+          </Pressable>
+          <Pressable style={styles.sheetBtn} onPress={onChooseNew}>
+            <Text style={styles.sheetBtnText}>Choose new photo</Text>
+          </Pressable>
+          <Pressable style={[styles.sheetBtn, styles.sheetCancel]} onPress={() => setSheetOpen(false)}>
+            <Text style={[styles.sheetBtnText, { color: '#6B7280' }]}>Cancel</Text>
+          </Pressable>
+        </View>
+      </Modal>
+    </KeyboardAvoidingView>
+  );
+}
+
+/* ---------- Small field component ---------- */
+function Field({ label, value, placeholder, onChangeText, multiline, autoCapitalize }) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
-        style={styles.input}
-        placeholder="Your name"
-        placeholderTextColor="#9ca3af"
-        value={fullName}
-        onChangeText={setFullName}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#9CA3AF"
+        style={[styles.input, multiline && { height: 100, textAlignVertical: 'top' }]}
+        multiline={multiline}
+        autoCapitalize={autoCapitalize}
       />
-
-      {/* Username */}
-      <Text style={styles.label}>Username</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="unique_id"
-        placeholderTextColor="#9ca3af"
-        autoCapitalize="none"
-        autoCorrect={false}
-        value={username}
-        onChangeText={setUsername}
-      />
-
-      {/* Bio */}
-      <Text style={styles.label}>Bio</Text>
-      <TextInput
-        style={[styles.input, { height: 96 }]}
-        placeholder="A short bio…"
-        placeholderTextColor="#9ca3af"
-        multiline
-        value={bio}
-        onChangeText={setBio}
-      />
-
-      <Button title={saving ? 'Saving…' : 'Save'} onPress={saveProfile} disabled={saving} />
-      <Text style={styles.hint}>Stored at: {BUCKET}/{photoPath || '(none)'}</Text>
     </View>
   );
 }
 
+/* ---------- Styles ---------- */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 16 },
-  center: { alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  container: { padding: 20, paddingBottom: 40 },
 
-  title: { fontSize: 20, fontWeight: '700', textAlign: 'center', marginBottom: 16 },
+  avatarWrap: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+    overflow: 'hidden',
+    alignSelf: 'center',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: AVATAR_SIZE / 2,
+    backgroundColor: '#E5E7EB',
+  },
+  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
+  avatarFallbackText: { fontSize: 48, fontWeight: '700', color: '#6B7280' },
 
-  avatar: { width: 120, height: 120, borderRadius: 60, alignSelf: 'center' },
-  avatarPlaceholder: { backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' },
-  avatarTxt: { color: '#111', fontWeight: '700', fontSize: 36 },
+  editBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: AVATAR_SIZE * 0.28,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editText: { color: '#fff', fontWeight: '700', letterSpacing: 1 },
 
-  label: { fontSize: 12, color: '#6b7280', marginTop: 14, marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 12, color: '#111' },
+  field: { marginBottom: 16 },
+  fieldLabel: { marginBottom: 6, color: '#111827', fontWeight: '600' },
+  input: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#111827',
+    backgroundColor: '#fff',
+  },
 
-  hint: { marginTop: 12, color: '#9ca3af', fontSize: 12 },
+  primaryBtn: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#111827',
+    alignItems: 'center',
+  },
+  primaryBtnText: { color: '#fff', fontWeight: '700' },
+
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  sheet: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    gap: 8,
+  },
+  sheetBtn: {
+    backgroundColor: '#fff',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  sheetBtnText: { fontWeight: '600', color: '#111827' },
+  sheetCancel: { backgroundColor: '#F3F4F6', marginTop: 4 },
 });
