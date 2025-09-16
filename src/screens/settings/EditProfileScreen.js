@@ -12,11 +12,13 @@ import {
   Platform,
   ScrollView,
   Modal,
+  Image as RNImage, // for getSize on native
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from '../../lib/supabaseClient';
+import CropperModal from '../../components/CropperModal'; // web/native 自動分流
 
 const AVATAR_SIZE = 160;
 const BUCKET = 'avatars';
@@ -35,6 +37,10 @@ export default function EditProfileScreen() {
 
   // Actions bottom sheet
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  // 可視化裁切（Web 用）
+  const [cropVisible, setCropVisible] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState(null); // uri
 
   useEffect(() => {
     let alive = true;
@@ -81,13 +87,34 @@ export default function EditProfileScreen() {
     return `${id}/${Date.now()}.${safe}`;
   };
 
+  /** 取得圖片實際尺寸（web/native 各自方式） */
+  const getImageSize = (uri) => new Promise((resolve, reject) => {
+    if (Platform.OS === 'web') {
+      const img = new global.Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = reject;
+      img.src = uri;
+    } else {
+      RNImage.getSize(uri, (w, h) => resolve({ width: w, height: h }), reject);
+    }
+  });
+
+  /** 置中裁切成正方形 */
+  const centerSquareCrop = (w, h) => {
+    const side = Math.min(w, h);
+    const originX = Math.max(0, Math.floor((w - side) / 2));
+    const originY = Math.max(0, Math.floor((h - side) / 2));
+    return { originX, originY, width: side, height: side };
+  };
+
   /** 上傳：Web 用 blob；原生用 arrayBuffer */
   const uploadUri = async (uri) => {
-    const ext = uri.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+    const lower = (uri || '').toLowerCase();
+    const ext = lower.includes('.png') ? 'png' : 'jpg';
     const path = filePath(ext);
 
     if (Platform.OS === 'web') {
-      const res = await fetch(uri);
+      const res = await fetch(uri, { cache: 'no-store' });
       const blob = await res.blob();
       const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
         contentType: blob.type || (ext === 'png' ? 'image/png' : 'image/jpeg'),
@@ -118,34 +145,36 @@ export default function EditProfileScreen() {
   /** 點 EDIT → 打開面板 */
   const handleEditPress = () => setSheetOpen(true);
 
-  /** 裁切現有照片（自動置中裁成 1:1，無額外 UI） */
-  const onCropCurrent = async () => {
-    try {
-      setSheetOpen(false);
-      if (!avatarUrl) {
-        Alert.alert('No photo', 'You have no profile photo to crop yet.');
-        return;
-      }
-      // 把 public URL 取回來做本地處理
-      const res = await fetch(avatarUrl, { cache: 'no-store' });
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
-      // 先讀一下尺寸（用 manipulator 取得 meta 不太方便，這裡直接「居中裁成 512x512」）
-      // 簡化：直接 resize 成 512 x 512（視覺上等同 1:1）
-      const square = await ImageManipulator.manipulateAsync(
-        blobUrl,
-        [{ resize: { width: 512, height: 512 } }],
-        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
-      );
-      await uploadUri(square.uri);
-    } catch (e) {
-      console.log('[crop current]', e);
-      Alert.alert('Failed', String(e?.message || e));
+  /** 裁切現有照片（web：打開拖曳裁切；原生：先提示用系統裁切） */
+const onCropCurrent = async () => {
+  try {
+    setSheetOpen(false);
+    if (!avatarUrl) {
+      Alert.alert('No photo', 'You have no profile photo to crop yet.');
+      return;
     }
-  };
 
-  /** 選擇新照片（用系統裁切器 1:1） */
+    if (Platform.OS === 'web') {
+      const res = await fetch(avatarUrl, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to fetch current photo');
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      setImageToCrop(objUrl);
+      setCropVisible(true);
+    } else {
+      Alert.alert(
+        'Crop on device',
+        'On iOS/Android, please reselect a photo and use the system cropper.',
+        [{ text: 'OK' }]
+      );
+    }
+  } catch (e) {
+    console.log('[crop current]', e);
+    Alert.alert('Failed', String(e?.message || e));
+  }
+};
+
+  /** 選擇新照片：web → 進拖曳裁切；原生 → 系統裁切器後保險縮 512 */
   const onChooseNew = async () => {
     try {
       setSheetOpen(false);
@@ -154,17 +183,24 @@ export default function EditProfileScreen() {
         Alert.alert('Permission needed', 'We need media permission to select a photo.');
         return;
       }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
+        allowsEditing: Platform.OS !== 'web',
         aspect: [1, 1],
         quality: 1,
       });
       if (result.canceled) return;
+
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
 
-      // 再保險縮成 512x512
+      if (Platform.OS === 'web') {
+        setImageToCrop(asset.uri);
+        setCropVisible(true);
+        return;
+      }
+
       const final = await ImageManipulator.manipulateAsync(
         asset.uri,
         [{ resize: { width: 512, height: 512 } }],
@@ -174,6 +210,27 @@ export default function EditProfileScreen() {
     } catch (e) {
       console.log('[pick new]', e);
       Alert.alert('Failed', String(e?.message || e));
+    }
+  };
+
+  const handleCropSave = async (croppedUri) => {
+    try {
+      setCropVisible(false);
+  
+      // 先量尺寸
+      const { width, height } = await getImageSize(croppedUri);
+      const crop = centerSquareCrop(width, height);
+  
+      const squared = await ImageManipulator.manipulateAsync(
+        croppedUri,
+        [{ crop }, { resize: { width: 512, height: 512 } }],
+        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+      );
+  
+      await uploadUri(squared.uri);
+    } catch (e) {
+      console.log('[crop save]', e);
+      Alert.alert('Failed to save', String(e?.message || e));
     }
   };
 
@@ -268,6 +325,14 @@ export default function EditProfileScreen() {
           </Pressable>
         </View>
       </Modal>
+
+      {/* 可視化拖曳裁切：web/native 自動挑對應實作 */}
+      <CropperModal
+        visible={cropVisible}
+        imageUri={imageToCrop}
+        onClose={() => setCropVisible(false)}
+        onSave={handleCropSave}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -318,10 +383,8 @@ const styles = StyleSheet.create({
 
   editBar: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: AVATAR_SIZE * 0.28,
+    left: 0, right: 0, bottom: 0,
+    height: AVATAR_SIZE * 0.22,
     backgroundColor: 'rgba(0,0,0,0.48)',
     justifyContent: 'center',
     alignItems: 'center',
