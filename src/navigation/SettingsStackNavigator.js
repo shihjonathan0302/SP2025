@@ -2,6 +2,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SettingsScreen from '../screens/SettingsScreen';
+import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import PlaceholderScreen from '../screens/settings/PlaceholderScreen';
 
 const SettingsStack = createNativeStackNavigator();
@@ -11,7 +12,7 @@ export default function SettingsStackNavigator() {
     <SettingsStack.Navigator
       screenOptions={{
         headerTitleAlign: 'center',
-        gestureEnabled: true, // ✅ 啟用 iOS 向右滑返回
+        gestureEnabled: true,
       }}
     >
       <SettingsStack.Screen
@@ -19,7 +20,11 @@ export default function SettingsStackNavigator() {
         component={SettingsScreen}
         options={{ title: 'Settings' }}
       />
-      <SettingsStack.Screen name="EditProfile" component={PlaceholderScreen} />
+      <SettingsStack.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{ title: 'Edit Profile' }}
+      />
       <SettingsStack.Screen name="ChangePassword" component={PlaceholderScreen} />
       <SettingsStack.Screen name="NotificationSettings" component={PlaceholderScreen} />
       <SettingsStack.Screen name="PrivacySettings" component={PlaceholderScreen} />
