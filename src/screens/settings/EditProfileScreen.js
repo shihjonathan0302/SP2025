@@ -64,9 +64,10 @@ export default function EditProfileScreen() {
           setBio(data.bio ?? '');
           if (data.avatar_url) {
             setAvatarPath(data.avatar_url);
-            setAvatarUrl(publicUrl(data.avatar_url));
-          }
+            const url0 = publicUrl(data.avatar_url);
+            setAvatarUrl(`${url0}?t=${Date.now()}`); // ← 首次也加一個 bust
         }
+      }
       } catch (e) {
         console.log('[profile load]', e);
       } finally {
@@ -86,6 +87,34 @@ export default function EditProfileScreen() {
     const id = uid || 'anon';
     return `${id}/${Date.now()}.${safe}`;
   };
+
+  // 固定原圖的儲存路徑（和頭像同資料夾）
+const originalPath = () => `${uid || 'anon'}/original.jpg`;
+const publicUrlFor = (path) => supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+
+// 上傳「原圖」(不寫入 DB，只放到 Storage，供之後裁切用)
+const uploadOriginal = async (uri) => {
+  const path = originalPath();
+
+  if (Platform.OS === 'web') {
+    const res = await fetch(uri, { cache: 'no-store' });
+    const blob = await res.blob();
+    const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+      contentType: blob.type || 'image/jpeg',
+      upsert: true,
+    });
+    if (error) throw error;
+  } else {
+    const res = await fetch(uri);
+    const buf = await res.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, {
+      contentType: 'image/jpeg',
+      upsert: true,
+    });
+    if (error) throw error;
+  }
+};
 
   /** 取得圖片實際尺寸（web/native 各自方式） */
   const getImageSize = (uri) => new Promise((resolve, reject) => {
@@ -139,7 +168,8 @@ export default function EditProfileScreen() {
     if (up2) throw up2;
 
     setAvatarPath(path);
-    setAvatarUrl(publicUrl(path));
+    const url = publicUrl(path);
+    setAvatarUrl(`${url}?t=${Date.now()}`); // ← cache-bust
   };
 
   /** 點 EDIT → 打開面板 */
@@ -155,11 +185,19 @@ const onCropCurrent = async () => {
     }
 
     if (Platform.OS === 'web') {
-      const res = await fetch(avatarUrl, { cache: 'no-store' });
-      if (!res.ok) throw new Error('Failed to fetch current photo');
-      const blob = await res.blob();
-      const objUrl = URL.createObjectURL(blob);
-      setImageToCrop(objUrl);
+      const tryOriginal = publicUrlFor(originalPath());
+       let res = await fetch(tryOriginal, { cache: 'no-store' });
+       let objUrl;
+       if (res.ok) {
+         const blob = await res.blob();
+         objUrl = URL.createObjectURL(blob);
+       } else {
+         res = await fetch(avatarUrl, { cache: 'no-store' });
+         if (!res.ok) throw new Error('Failed to fetch current photo');
+         const blob = await res.blob();
+         objUrl = URL.createObjectURL(blob);
+       }
+       setImageToCrop(objUrl);
       setCropVisible(true);
     } else {
       Alert.alert(
@@ -195,6 +233,8 @@ const onCropCurrent = async () => {
       const asset = result.assets?.[0];
       if (!asset?.uri) return;
 
+      await uploadOriginal(asset.uri);
+
       if (Platform.OS === 'web') {
         setImageToCrop(asset.uri);
         setCropVisible(true);
@@ -217,23 +257,36 @@ const onCropCurrent = async () => {
     try {
       setCropVisible(false);
   
-      // 先量尺寸
-      const { width, height } = await getImageSize(croppedUri);
+      // Web 的 croppedUri 多半是 objectURL 或 dataURL；先統一成 blob → blobURL
+      let workUri = croppedUri;
+      if (Platform.OS === 'web') {
+        const r = await fetch(croppedUri, { cache: 'no-store' });
+        const blob = await r.blob();
+        workUri = URL.createObjectURL(blob);
+      }
+  
+      // 量尺寸 → 正中心裁正方形 → 再縮 512x512（避免長寬比問題）
+      const { width, height } = await getImageSize(workUri);
       const crop = centerSquareCrop(width, height);
   
       const squared = await ImageManipulator.manipulateAsync(
-        croppedUri,
+        workUri,
         [{ crop }, { resize: { width: 512, height: 512 } }],
         { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
       );
   
       await uploadUri(squared.uri);
+  
+      // 回收 objectURL（若有）
+      if (Platform.OS === 'web' && workUri.startsWith('blob:')) {
+        try { URL.revokeObjectURL(workUri); } catch {}
+      }
     } catch (e) {
       console.log('[crop save]', e);
       Alert.alert('Failed to save', String(e?.message || e));
     }
   };
-
+  
   const handleSave = async () => {
     if (!uid) return;
     try {

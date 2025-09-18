@@ -5,13 +5,60 @@ import Cropper from 'react-easy-crop';
 export default function CropperModal({ visible, imageUri, onClose, onSave }) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
 
+  // ✅ hooks 一律在頂層宣告，不能放在條件 return 之後
+  const onCropComplete = useCallback((_, areaPixels) => {
+    setCroppedAreaPixels(areaPixels);
+  }, []);
+
+  const createCroppedObjectURL = async (src, area) => {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.crossOrigin = 'anonymous';
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = src;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = area.width;
+    canvas.height = area.height;
+    const ctx = canvas.getContext('2d');
+
+    ctx.drawImage(
+      img,
+      area.x, area.y, area.width, area.height,
+      0, 0, area.width, area.height
+    );
+
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.95)
+    );
+    return URL.createObjectURL(blob);
+  };
+
+  const handleSave = async () => {
+    try {
+      if (!croppedAreaPixels) {
+        onSave?.(imageUri);
+        return;
+      }
+      const objUrl = await createCroppedObjectURL(imageUri, croppedAreaPixels);
+      onSave?.(objUrl);
+    } catch (e) {
+      console.error('[web crop save]', e);
+      onSave?.(imageUri);
+    }
+  };
+
+  // 你可以保留條件 return（現在 hooks 都已宣告在上面，不會再違規）
   if (!visible) return null;
 
   return (
     <div style={styles.backdrop} onClick={onClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <div style={{ position: 'relative', width: 300, height: 300 }}>
+        <div style={{ position: 'relative', width: 320, height: 320 }}>
           <Cropper
             image={imageUri}
             crop={crop}
@@ -19,19 +66,12 @@ export default function CropperModal({ visible, imageUri, onClose, onSave }) {
             aspect={1}
             onCropChange={setCrop}
             onZoomChange={setZoom}
+            onCropComplete={onCropComplete}
           />
         </div>
         <div style={styles.actions}>
-          <button onClick={onClose} style={styles.btn}>
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              // Web: 直接把原始 uri 傳回去，先不做複雜裁切運算
-              onSave(imageUri);
-            }}
-            style={{ ...styles.btn, background: '#111', color: '#fff' }}
-          >
+          <button onClick={onClose} style={styles.btn}>Cancel</button>
+          <button onClick={handleSave} style={{ ...styles.btn, background: '#111', color: '#fff' }}>
             Save
           </button>
         </div>
@@ -54,7 +94,7 @@ const styles = {
     background: '#fff',
     borderRadius: 12,
     padding: 16,
-    width: 340,
+    width: 360,
     maxWidth: '90%',
   },
   actions: {
