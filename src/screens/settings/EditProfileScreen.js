@@ -341,11 +341,10 @@ const onCropCurrent = async () => {
           onChangeText={setFullName}
         />
         <Field
-          label="Username"
-          value={username}
-          placeholder="your_handle"
-          onChangeText={setUsername}
-          autoCapitalize="none"
+          label="ID"
+          value={uid || ''}
+          placeholder="Your ID"
+          editable={false}
         />
         <Field
           label="Bio"
@@ -391,19 +390,25 @@ const onCropCurrent = async () => {
 }
 
 /* ---------- Small field component ---------- */
-function Field({ label, value, placeholder, onChangeText, multiline, autoCapitalize }) {
+function Field({ label, value, placeholder, onChangeText, multiline, autoCapitalize, editable = true }) {
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor="#9CA3AF"
-        style={[styles.input, multiline && { height: 100, textAlignVertical: 'top' }]}
-        multiline={multiline}
-        autoCapitalize={autoCapitalize}
-      />
+      {editable ? (
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="#9CA3AF"
+          style={[styles.input, multiline && { height: 100, textAlignVertical: 'top' }]}
+          multiline={multiline}
+          autoCapitalize={autoCapitalize}
+        />
+      ) : (
+        <View style={[styles.input, styles.inputDisabled]}>
+          <Text style={styles.inputDisabledText}>{value || placeholder}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -486,4 +491,14 @@ const styles = StyleSheet.create({
   },
   sheetBtnText: { fontWeight: '600', color: '#111827' },
   sheetCancel: { backgroundColor: '#F3F4F6', marginTop: 4 },
+
+  inputDisabled: {
+    backgroundColor: '#F3F4F6', // 淺灰色底
+    borderColor: '#E5E7EB',
+  },
+  
+  inputDisabledText: {
+    fontSize: 16,
+    color: '#9CA3AF', // 灰色字
+  },
 });

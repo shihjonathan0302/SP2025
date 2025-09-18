@@ -10,12 +10,18 @@ import {
   SectionList,
   Pressable,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { supabase } from '../lib/supabaseClient';
+
+const AVATAR_BUCKET = 'avatars';
 
 export default function SettingsScreen({ navigation }) {
   // ===== User info (for header) =====
   const [email, setEmail] = useState('');
-  const [providers, setProviders] = useState([]);
+  const [userId, setUserId] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState(null);
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -26,9 +32,24 @@ export default function SettingsScreen({ navigation }) {
 
         const user = data?.user;
         setEmail(user?.email ?? '');
+        setUserId(user?.id ?? '');
 
-        const provs = (user?.identities || []).map((i) => i.provider || 'email');
-        setProviders(provs.length ? Array.from(new Set(provs)) : ['email']);
+        // 讀取 profiles 取得 full_name 與 avatar_url
+        if (user?.id) {
+          const { data: p } = await supabase
+            .from('profiles')
+            .select('full_name, avatar_url')
+            .eq('id', user.id)
+            .single();
+
+          const nameFallback = (user?.email || '').split('@')[0] || 'Your profile';
+          setDisplayName(p?.full_name?.trim() || nameFallback);
+
+          if (p?.avatar_url) {
+            const url = publicUrl(p.avatar_url);
+            setAvatarUrl(url ? `${url}?t=${Date.now()}` : null); // 簡單 cache-bust
+          }
+        }
       } catch {
         // ignore
       }
@@ -37,6 +58,9 @@ export default function SettingsScreen({ navigation }) {
       alive = false;
     };
   }, []);
+
+  const publicUrl = (path) =>
+    supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path).data.publicUrl;
 
   // ===== Sign out =====
   const doSignOut = async () => {
@@ -154,18 +178,27 @@ export default function SettingsScreen({ navigation }) {
     <View style={styles.container}>
       {/* Profile Header */}
       <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarTxt}>{(email || 'U')[0].toUpperCase()}</Text>
-        </View>
+        {/* Avatar：有圖用圖，沒有用首字母 */}
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={styles.avatar} contentFit="cover" transition={150} />
+        ) : (
+          <View style={[styles.avatar, styles.avatarFallback]}>
+            <Text style={styles.avatarTxt}>
+              {(displayName || email || 'U').slice(0, 1).toUpperCase()}
+            </Text>
+          </View>
+        )}
+
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Settings</Text>
+          {/* 標題換成使用者姓名（不顯示 username） */}
+          <Text style={styles.headerTitle}>{displayName || 'Your profile'}</Text>
           <Text style={styles.headerSubtitle}>
             {email ? `Signed in as ${email}` : 'Signed in'}
           </Text>
-          <Text style={styles.headerMinor}>
-            Providers: {providers.join(', ')}
-          </Text>
+          {/* 第三行改成 ID */}
+          {!!userId && <Text style={styles.headerMinor}>ID: {userId}</Text>}
         </View>
+
         <VersionRow />
       </View>
 
@@ -207,14 +240,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    overflow: 'hidden',
     backgroundColor: '#111',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
+  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarTxt: { color: '#fff', fontWeight: '700', fontSize: 18 },
+
   headerTitle: { fontSize: 20, fontWeight: '700' },
   headerSubtitle: { color: '#666', marginTop: 2 },
   headerMinor: { color: '#888', fontSize: 12, marginTop: 2 },
