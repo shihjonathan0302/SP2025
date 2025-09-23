@@ -93,7 +93,7 @@ export default function SettingsScreen({ navigation }) {
       data: [
         { id: 'EditProfile', title: 'Edit Profile' },
         { id: 'LinkedAccounts', title: 'Linked Accounts' },
-        { id: 'PasswordSecurity', title: 'Password and Security' },
+        { id: 'PasswordSecurity', title: 'Password & Security' },
         { id: 'Subscriptions', title: 'Subscriptions' }, // 先佔位
       ],
     },
