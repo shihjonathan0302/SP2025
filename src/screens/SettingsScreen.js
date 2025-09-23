@@ -92,9 +92,9 @@ export default function SettingsScreen({ navigation }) {
       title: 'Account',
       data: [
         { id: 'EditProfile', title: 'Edit Profile' },
-        { id: 'EmailPassword', title: 'Email & Password' },
-        { id: 'ShareAccount', title: 'Share Account' },   // 目前到 Placeholder
-        { id: 'DeleteAccount', title: 'Delete Account' }, // 目前到 Placeholder
+        { id: 'LinkedAccounts', title: 'Linked Accounts' },
+        { id: 'PasswordSecurity', title: 'Password and Security' },
+        { id: 'Subscriptions', title: 'Subscriptions' }, // 先佔位
       ],
     },
     {
