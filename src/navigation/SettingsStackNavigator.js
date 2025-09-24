@@ -6,6 +6,7 @@
  import PlaceholderScreen from '../screens/settings/PlaceholderScreen';
  import LinkedAccountsScreen from '../screens/settings/LinkedAccountsScreen';
  import PasswordSecurityScreen from '../screens/settings/PasswordSecurityScreen';
+ import SubscriptionScreen from '../screens/settings/SubscriptionScreen';
 
 
  const SettingsStack = createNativeStackNavigator();
@@ -37,6 +38,11 @@
          name="PasswordSecurity"
          component={PasswordSecurityScreen}
          options={{ title: 'Password & Security' }}
+       />
+       <SettingsStack.Screen
+         name="Subscriptions"
+         component={SubscriptionScreen}
+         options={{ title: 'Subscriptions' }}
        />
        <SettingsStack.Screen name="NotificationSettings" component={PlaceholderScreen} />
        <SettingsStack.Screen name="PrivacySettings" component={PlaceholderScreen} />
