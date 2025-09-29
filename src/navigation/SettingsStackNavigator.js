@@ -24,6 +24,8 @@ export default function SettingsStackNavigator() {
       screenOptions={{
         headerTitleAlign: 'center',
         gestureEnabled: true,
+        animation: 'slide_from_right',  
+        presentation: 'card',
       }}
     >
       {/* 第一層：只放分類 */}
@@ -45,6 +47,7 @@ export default function SettingsStackNavigator() {
       <SettingsStack.Screen name="LinkedAccounts" component={LinkedAccountsScreen} options={{ title: 'Linked Accounts' }} />
       <SettingsStack.Screen name="PasswordSecurity" component={PasswordSecurityScreen} options={{ title: 'Password & Security' }} />
       <SettingsStack.Screen name="Subscriptions" component={SubscriptionScreen} options={{ title: 'Subscriptions' }} />
+      <SettingsStack.Screen name="DeleteAccount" component={PlaceholderScreen} options={{ title: 'Delete Account' }} />
 
       {/* 其他分類（之後換成真正頁面） */}
       <SettingsStack.Screen name="Preferences" component={PlaceholderScreen} />
@@ -52,6 +55,7 @@ export default function SettingsStackNavigator() {
       <SettingsStack.Screen name="PrivacySharing" component={PlaceholderScreen} />
       <SettingsStack.Screen name="DataSecurity" component={PlaceholderScreen} />
       <SettingsStack.Screen name="Support" component={PlaceholderScreen} />
+
     </SettingsStack.Navigator>
   );
 }
