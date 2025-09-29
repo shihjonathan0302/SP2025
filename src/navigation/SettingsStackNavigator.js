@@ -1,53 +1,57 @@
- // navigation/SettingsStackNavigator.js
- import React from 'react';
- import { createNativeStackNavigator } from '@react-navigation/native-stack';
- import SettingsScreen from '../screens/SettingsScreen';
- import EditProfileScreen from '../screens/settings/EditProfileScreen';
- import PlaceholderScreen from '../screens/settings/PlaceholderScreen';
- import LinkedAccountsScreen from '../screens/settings/LinkedAccountsScreen';
- import PasswordSecurityScreen from '../screens/settings/PasswordSecurityScreen';
- import SubscriptionScreen from '../screens/settings/SubscriptionScreen';
+ // src/navigation/SettingsStackNavigator.js
+import React from 'react';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+// 第一層首頁（分類）
+import SettingsHome from '../screens/settings/SettingsHome';
+// Accounts 第二層
+import AccountsHome from '../screens/settings/AccountsHome';
 
- const SettingsStack = createNativeStackNavigator();
+// 既有細頁
+import EditProfileScreen from '../screens/settings/EditProfileScreen';
+import LinkedAccountsScreen from '../screens/settings/LinkedAccountsScreen';
+import PasswordSecurityScreen from '../screens/settings/PasswordSecurityScreen';
+import SubscriptionScreen from '../screens/settings/SubscriptionScreen';
 
- export default function SettingsStackNavigator() {
-   return (
-     <SettingsStack.Navigator
-       screenOptions={{
-         headerTitleAlign: 'center',
-         gestureEnabled: true,
-       }}
-     >
-       <SettingsStack.Screen
-         name="SettingsHome"
-         component={SettingsScreen}
-         options={{ title: 'Settings' }}
-       />
-       <SettingsStack.Screen
-         name="EditProfile"
-         component={EditProfileScreen}
-         options={{ title: 'Edit Profile' }}
-       />
-       <SettingsStack.Screen
-         name="LinkedAccounts"
-         component={LinkedAccountsScreen}
-         options={{ title: 'Linked Accounts' }}
-       />
-       <SettingsStack.Screen
-         name="PasswordSecurity"
-         component={PasswordSecurityScreen}
-         options={{ title: 'Password & Security' }}
-       />
-       <SettingsStack.Screen
-         name="Subscriptions"
-         component={SubscriptionScreen}
-         options={{ title: 'Subscriptions' }}
-       />
-       <SettingsStack.Screen name="NotificationSettings" component={PlaceholderScreen} />
-       <SettingsStack.Screen name="PrivacySettings" component={PlaceholderScreen} />
-       <SettingsStack.Screen name="LanguageSettings" component={PlaceholderScreen} />
-       <SettingsStack.Screen name="About" component={PlaceholderScreen} />
-     </SettingsStack.Navigator>
-   );
- }
+// 其他分類（先用你原本的 Placeholder）
+import PlaceholderScreen from '../screens/settings/PlaceholderScreen';
+
+const SettingsStack = createNativeStackNavigator();
+
+export default function SettingsStackNavigator() {
+  return (
+    <SettingsStack.Navigator
+      screenOptions={{
+        headerTitleAlign: 'center',
+        gestureEnabled: true,
+      }}
+    >
+      {/* 第一層：只放分類 */}
+      <SettingsStack.Screen
+        name="SettingsHome"
+        component={SettingsHome}
+        options={{ title: 'Settings' }}
+      />
+
+      {/* 第二層：Accounts */}
+      <SettingsStack.Screen
+        name="AccountsHome"
+        component={AccountsHome}
+        options={{ title: 'Account' }}
+      />
+
+      {/* Accounts 細頁 */}
+      <SettingsStack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit Profile' }} />
+      <SettingsStack.Screen name="LinkedAccounts" component={LinkedAccountsScreen} options={{ title: 'Linked Accounts' }} />
+      <SettingsStack.Screen name="PasswordSecurity" component={PasswordSecurityScreen} options={{ title: 'Password & Security' }} />
+      <SettingsStack.Screen name="Subscriptions" component={SubscriptionScreen} options={{ title: 'Subscriptions' }} />
+
+      {/* 其他分類（之後換成真正頁面） */}
+      <SettingsStack.Screen name="Preferences" component={PlaceholderScreen} />
+      <SettingsStack.Screen name="Notifications" component={PlaceholderScreen} />
+      <SettingsStack.Screen name="PrivacySharing" component={PlaceholderScreen} />
+      <SettingsStack.Screen name="DataSecurity" component={PlaceholderScreen} />
+      <SettingsStack.Screen name="Support" component={PlaceholderScreen} />
+    </SettingsStack.Navigator>
+  );
+}
