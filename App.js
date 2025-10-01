@@ -2,15 +2,17 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { Platform, TouchableOpacity } from 'react-native';
-import { NavigationContainer, getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { NavigationContainer, getFocusedRouteNameFromRoute, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { GoalsProvider } from './src/contexts/GoalsContext';
+import { PrefsProvider } from './src/contexts/PrefsContext';
+import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 
 import MainScreen from './src/screens/MainScreen';
-import CommunityScreen from './src/screens/CommunityScreen'; // ← 已改名
+import CommunityScreen from './src/screens/CommunityScreen';
 import GoalDetailScreen from './src/screens/GoalDetailScreen';
 import SettingsStackNavigator from './src/navigation/SettingsStackNavigator';
 import ReportsStackNavigator from './src/navigation/ReportsStackNavigator';
@@ -25,8 +27,8 @@ function Tabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerShown: false,          // 由 Root 的 header 管理
-        tabBarShowLabel: false,      // 只顯示 icon
+        headerShown: false,
+        tabBarShowLabel: false,
         tabBarIcon: ({ color }) => {
           let icon = 'ellipse';
           if (route.name === 'Main') icon = 'home-outline';
@@ -52,9 +54,7 @@ function RootNavigator({ isSignedIn }) {
             name="RootTabs"
             component={Tabs}
             options={({ navigation, route }) => {
-              // 取得目前 Tab 內聚焦中的子頁
               const focused = getFocusedRouteNameFromRoute(route) ?? 'Main';
-              // 對應標題
               const titleMap = {
                 Main: 'Dashboard',
                 Reports: 'Reports',
@@ -85,7 +85,6 @@ function RootNavigator({ isSignedIn }) {
             options={{ title: 'Goal' }}
           />
 
-          {/* 設定獨立 stack（由左上角 icon 進入） */}
           <Stack.Screen
             name="Settings"
             component={SettingsStackNavigator}
@@ -96,6 +95,17 @@ function RootNavigator({ isSignedIn }) {
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
       )}
     </Stack.Navigator>
+  );
+}
+
+// AppInner 負責使用 theme
+function AppInner({ isSignedIn }) {
+  const { theme } = useTheme(); // 從 ThemeContext 取得現在主題
+
+  return (
+    <NavigationContainer theme={theme === 'dark' ? DarkTheme : DefaultTheme}>
+      <RootNavigator isSignedIn={isSignedIn} />
+    </NavigationContainer>
   );
 }
 
@@ -132,9 +142,11 @@ export default function App() {
 
   return (
     <GoalsProvider>
-      <NavigationContainer>
-        <RootNavigator isSignedIn={isSignedIn} />
-      </NavigationContainer>
+      <PrefsProvider>
+        <ThemeProvider>
+          <AppInner isSignedIn={isSignedIn} />
+        </ThemeProvider>
+      </PrefsProvider>
     </GoalsProvider>
   );
 }

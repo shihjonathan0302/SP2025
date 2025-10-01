@@ -77,7 +77,7 @@ export default function SettingsHome({ navigation }) {
 
         {/* 第一層分類入口（更 compact） */}
         <SectionCard icon="person-circle-outline"  title="Account"             onPress={() => go('AccountsHome')} />
-        <SectionCard icon="options-outline"        title="Preferences"         onPress={() => go('Preferences')} />
+        <SectionCard icon="options-outline"        title="Preferences"         onPress={() => go('PreferencesHome')} />
         <SectionCard icon="notifications-outline"  title="Notifications"       onPress={() => go('Notifications')} />
         <SectionCard icon="share-social-outline"   title="Privacy & Sharing"   onPress={() => go('PrivacySharing')} />
         <SectionCard icon="shield-checkmark-outline" title="Data & Security"   onPress={() => go('DataSecurity')} />

@@ -1,37 +1,44 @@
-// src/screens/settings/AccountsHome.js
+// src/screens/settings/PreferencesHome.js
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function AccountsHome({ navigation }) {
+export default function PreferencesHome({ navigation }) {
   const go = (name) => navigation.navigate(name);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Account</Text>
-      <Text style={styles.caption}>Manage your profile and sign-in methods.</Text>
+      <Text style={styles.title}>Preferences</Text>
+      <Text style={styles.caption}>Customize how the app looks and behaves.</Text>
 
-      <Row icon="create-outline" title="Edit Profile" onPress={() => go('EditProfile')} />
-      <Row icon="link-outline" title="Linked Accounts" onPress={() => go('LinkedAccounts')} />
-      <Row icon="lock-closed-outline" title="Password & Security" onPress={() => go('PasswordSecurity')} />
-
-      {/* Subscriptions → Coming soon */}
-      <Row icon="card-outline" title="Subscriptions" disabled comingSoon />
-
-      <View style={{ height: 8 }} />
-
-      {/* 危險操作：Delete Account */}
+      {/* Theme → 可點擊 */}
       <Row
-        danger
-        icon="trash-outline"
-        title="Delete Account"
-        onPress={() => go('DeleteAccount')}
+        icon="color-palette-outline"
+        title="Theme"
+        onPress={() => go('PreferencesTheme')}
+      />
+
+      {/* Language → Coming soon */}
+      <Row
+        icon="language-outline"
+        title="Language"
+        disabled
+        comingSoon
+      />
+
+      {/* Goal Tracking Style → Coming soon */}
+      <Row
+        icon="trending-up-outline"
+        title="Goal Tracking Style"
+        disabled
+        comingSoon
       />
     </View>
   );
 }
 
-function Row({ icon, title, onPress, danger, disabled, comingSoon }) {
+/* ----------------- Row component ----------------- */
+function Row({ icon, title, onPress, disabled, comingSoon }) {
   const handlePress = () => {
     if (!disabled && onPress) onPress();
   };
@@ -40,32 +47,18 @@ function Row({ icon, title, onPress, danger, disabled, comingSoon }) {
     <TouchableOpacity
       onPress={handlePress}
       disabled={disabled}
-      style={[
-        styles.row,
-        danger && styles.rowDanger,
-        disabled && styles.rowDisabled,
-      ]}
+      style={[styles.row, disabled && styles.rowDisabled]}
       activeOpacity={0.8}
     >
       <View style={styles.rowLeft}>
-        <View style={[
-          styles.ic,
-          danger && styles.icDanger,
-          disabled && styles.icDisabled,
-        ]}>
+        <View style={[styles.ic, disabled && styles.icDisabled]}>
           <Ionicons
             name={icon}
             size={18}
-            color={danger ? '#fff' : disabled ? '#9CA3AF' : '#111'}
+            color={disabled ? '#9CA3AF' : '#111'}
           />
         </View>
-        <Text
-          style={[
-            styles.rowTitle,
-            danger && { color: '#B91C1C' },
-            disabled && { color: '#9CA3AF' },
-          ]}
-        >
+        <Text style={[styles.rowTitle, disabled && { color: '#9CA3AF' }]}>
           {title}
         </Text>
       </View>
@@ -73,16 +66,13 @@ function Row({ icon, title, onPress, danger, disabled, comingSoon }) {
       {comingSoon ? (
         <Text style={styles.comingSoon}>Coming soon</Text>
       ) : (
-        <Ionicons
-          name="chevron-forward"
-          size={18}
-          color={danger ? '#B91C1C' : disabled ? '#D1D5DB' : '#9CA3AF'}
-        />
+        <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
       )}
     </TouchableOpacity>
   );
 }
 
+/* ----------------- Styles ----------------- */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', padding: 12 },
   title: { fontSize: 20, fontWeight: '700', marginTop: 6 },
@@ -101,7 +91,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-
   rowDisabled: { backgroundColor: '#FAFAFA' },
 
   rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -115,11 +104,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#F9FAFB',
   },
-  icDanger: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
   icDisabled: { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' },
 
   rowTitle: { fontSize: 16, fontWeight: '600', color: '#111' },
-  rowDanger: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
-
   comingSoon: { fontSize: 14, color: '#9CA3AF', fontWeight: '500' },
 });

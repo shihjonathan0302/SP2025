@@ -16,6 +16,9 @@ import SubscriptionScreen from '../screens/settings/SubscriptionScreen';
 // 其他分類（先用你原本的 Placeholder）
 import PlaceholderScreen from '../screens/settings/PlaceholderScreen';
 
+import PreferencesHome from '../screens/settings/PreferencesHome';
+import PreferencesThemeScreen from '../screens/settings/PreferencesThemeScreen';
+
 const SettingsStack = createNativeStackNavigator();
 
 export default function SettingsStackNavigator() {
@@ -50,11 +53,21 @@ export default function SettingsStackNavigator() {
       <SettingsStack.Screen name="DeleteAccount" component={PlaceholderScreen} options={{ title: 'Delete Account' }} />
 
       {/* 其他分類（之後換成真正頁面） */}
-      <SettingsStack.Screen name="Preferences" component={PlaceholderScreen} />
       <SettingsStack.Screen name="Notifications" component={PlaceholderScreen} />
       <SettingsStack.Screen name="PrivacySharing" component={PlaceholderScreen} />
       <SettingsStack.Screen name="DataSecurity" component={PlaceholderScreen} />
       <SettingsStack.Screen name="Support" component={PlaceholderScreen} />
+
+      <SettingsStack.Screen
+        name="PreferencesHome"
+        component={PreferencesHome}
+        options={{ title: 'Preferences' }}
+      />
+      <SettingsStack.Screen
+        name="PreferencesTheme"
+        component={PreferencesThemeScreen}
+        options={{ title: 'Theme' }}
+      />
 
     </SettingsStack.Navigator>
   );
