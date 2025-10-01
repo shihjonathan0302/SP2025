@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
 } from 'react-native';
+import { Platform } from 'react-native';
 
 export default function CropperModal({ visible, imageUri, onClose, onSave }) {
   if (!visible) return null;

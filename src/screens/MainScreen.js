@@ -1,5 +1,4 @@
 // screens/MainScreen.js
-
 import React, { useState } from 'react';
 import {
   View, Text, FlatList, Button, Modal, TextInput,
@@ -7,7 +6,7 @@ import {
 } from 'react-native';
 import { useGoals, calcProgress } from '../contexts/GoalsContext';
 
-// ADD: 連 Supabase 與 DB 服務層
+// 連 Supabase 與 DB 服務層
 import { supabase } from '../lib/supabaseClient';
 import * as db from '../services/db';
 
