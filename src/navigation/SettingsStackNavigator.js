@@ -30,6 +30,7 @@ export default function SettingsStackNavigator() {
       screenOptions={{
         headerTitleAlign: 'center',
         gestureEnabled: true,
+        animationTypeForReplace: 'pop',
         animation: 'slide_from_right',  
         presentation: 'card',
       }}
