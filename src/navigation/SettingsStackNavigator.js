@@ -18,8 +18,11 @@ import PlaceholderScreen from '../screens/settings/PlaceholderScreen';
 
 import PreferencesHome from '../screens/settings/PreferencesHome';
 import PreferencesThemeScreen from '../screens/settings/PreferencesThemeScreen';
-
 import NotificationsHome from '../screens/settings/NotificationsHome';
+import PrivacySharing from '../screens/settings/PrivacySharingScreen';
+import DataSecurityScreen from '../screens/settings/DataSecurityScreen';
+import SupportScreen from '../screens/settings/SupportScreen';
+import LegalScreen from '../screens/settings/LegalScreen';
 
 
 const SettingsStack = createNativeStackNavigator();
@@ -56,10 +59,6 @@ export default function SettingsStackNavigator() {
       <SettingsStack.Screen name="Subscriptions" component={SubscriptionScreen} options={{ title: 'Subscriptions' }} />
       <SettingsStack.Screen name="DeleteAccount" component={PlaceholderScreen} options={{ title: 'Delete Account' }} />
 
-      {/* 其他分類（之後換成真正頁面） */}
-      <SettingsStack.Screen name="PrivacySharing" component={PlaceholderScreen} />
-      <SettingsStack.Screen name="DataSecurity" component={PlaceholderScreen} />
-      <SettingsStack.Screen name="Support" component={PlaceholderScreen} />
 
       <SettingsStack.Screen
         name="PreferencesHome"
@@ -76,6 +75,30 @@ export default function SettingsStackNavigator() {
         name="NotificationsHome"
         component={NotificationsHome}
         options={{ title: 'Notifications' }}
+      />
+
+      <SettingsStack.Screen
+        name="PrivacySharing"
+        component={PrivacySharing}
+        options={{ title: 'Privacy & Sharing' }}
+      />
+
+      <SettingsStack.Screen
+        name="DataSecurity"
+        component={require('../screens/settings/DataSecurityScreen').default}
+        options={{ title: 'Data & Security' }}
+      />
+
+      <SettingsStack.Screen
+        name="Support"
+        component={require('../screens/settings/SupportScreen').default}
+        options={{ title: 'Support' }}
+      />
+
+      <SettingsStack.Screen
+        name="Legal"
+        component={require('../screens/settings/LegalScreen').default}
+        options={{ title: 'Legal' }}
       />
 
     </SettingsStack.Navigator>
