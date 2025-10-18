@@ -8,7 +8,7 @@ import SettingsHome from '../screens/settings/SettingsHome';
 import AccountsHome from '../screens/settings/AccountsHome';
 
 // 既有細頁
-import EditProfileScreen from '../screens/settings/EditProfileScreen';
+import EditProfileScreen from '../screens/settings/EditProfileScreen.js';
 import LinkedAccountsScreen from '../screens/settings/LinkedAccountsScreen';
 import PasswordSecurityScreen from '../screens/settings/PasswordSecurityScreen';
 import SubscriptionScreen from '../screens/settings/SubscriptionScreen';
