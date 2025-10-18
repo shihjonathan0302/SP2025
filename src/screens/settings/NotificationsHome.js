@@ -43,7 +43,7 @@ export default function NotificationsHome() {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: 'Daily Reminder',
-          body: 'Time to check your goals ✨',
+          body: 'Did you shave your balls today',
         },
         trigger: {
           hour: reminderTime.getHours(),
@@ -86,12 +86,14 @@ export default function NotificationsHome() {
           )}
         </View>
         <Switch
+          style={{ transform: [{ scale: 0.9 }] }}  // ✅ 可選，讓 iOS 看起來更自然
           value={reminderEnabled}
           onValueChange={toggleReminder}
           trackColor={{ false: '#d1d5db', true: currentTheme.colors.primary }}
-          thumbColor={reminderEnabled ? currentTheme.colors.primary : '#f4f3f4'}
-        />
-      </View>
+          thumbColor={reminderEnabled ? '#fff' : '#f4f3f4'}   // ✅ 白色圓點
+          ios_backgroundColor="#d1d5db"                       // ✅ iOS 灰底
+        />      
+        </View>
 
       {Platform.OS !== 'web' && showPicker && (
         <DateTimePicker
