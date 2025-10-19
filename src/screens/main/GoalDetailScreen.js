@@ -4,10 +4,10 @@ import {
   View, Text, StyleSheet, FlatList, TextInput, Button,
   TouchableOpacity, Switch, Platform, Alert
 } from 'react-native';
-import { useGoals } from '../contexts/GoalsContext';
+import { useGoals } from '../../contexts/GoalsContext';
 
 // ADD: DB 服務層
-import * as db from '../services/db';
+import * as db from '../../services/db';
 
 export default function GoalDetailScreen({ route }) {
   const { goalId } = route.params || {};

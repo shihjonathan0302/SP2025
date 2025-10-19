@@ -18,7 +18,7 @@ import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 
 import MainScreen from './src/screens/MainScreen';
 import CommunityScreen from './src/screens/CommunityScreen';
-import GoalDetailScreen from './src/screens/GoalDetailScreen';
+import GoalDetailScreen from './src/screens/main/GoalDetailScreen';
 import SettingsStackNavigator from './src/navigation/SettingsStackNavigator';
 import ReportsStackNavigator from './src/navigation/ReportsStackNavigator';
 
