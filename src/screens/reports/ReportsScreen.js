@@ -3,7 +3,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 // 如果不是 Expo，要改成： import LinearGradient from 'react-native-linear-gradient';
-import { useGoals, calcProgress } from '../contexts/GoalsContext';
+import { useGoals, calcProgress } from '../../contexts/GoalsContext';
 
 export default function ReportsScreen({ navigation }) {
   const { goals } = useGoals();

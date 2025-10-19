@@ -4,11 +4,11 @@ import {
   View, Text, FlatList, Button, Modal, TextInput,
   StyleSheet, TouchableOpacity, Alert, Platform
 } from 'react-native';
-import { useGoals, calcProgress } from '../contexts/GoalsContext';
+import { useGoals, calcProgress } from '../../contexts/GoalsContext';
 
 // 連 Supabase 與 DB 服務層
-import { supabase } from '../lib/supabaseClient';
-import * as db from '../services/db';
+import { supabase } from '../../lib/supabaseClient';
+import * as db from '../../services/db';
 
 // ==== 雲端 function URL（你的 project-ref 已恢復：baygppmzqzisddezwyrs）====
 const FUNC_URL = 'https://baygppmzqzisddezwyrs.functions.supabase.co/breakdown';
@@ -196,7 +196,7 @@ export default function MainScreen({ navigation }) {
   return (
     <View style={styles.container}>
       {/* 新增目標按鈕 */}
-      <Button title="+ Add Goal" onPress={openAdd} />
+      <Button title="+ Add Goal" onPress={() => navigation.navigate('CreateGoalFlow')} />
 
       {/* 目標清單 */}
       <FlatList

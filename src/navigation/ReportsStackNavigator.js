@@ -1,7 +1,7 @@
 // navigation/ReportsStackNavigation.js
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import ReportsScreen from '../screens/ReportsScreen';
+import ReportsScreen from '../screens/reports/ReportsScreen';
 import TotalGoalsScreen from '../screens/reports/TotalGoalsScreen';
 import CompletedGoalsScreen from '../screens/reports/CompletedGoalsScreen';
 import PendingGoalsScreen from '../screens/reports/PendingGoalsScreen';
