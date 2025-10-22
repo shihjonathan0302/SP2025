@@ -1,186 +1,138 @@
-// screens/MainScreen.js
-import React, { useState } from 'react';
+// screens/main/MainScreen.js
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, FlatList, Button, Modal, TextInput,
-  StyleSheet, TouchableOpacity, Alert, Platform
+  StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform,
 } from 'react-native';
-import { useGoals, calcProgress } from '../../contexts/GoalsContext';
-
-// 連 Supabase 與 DB 服務層
 import { supabase } from '../../lib/supabaseClient';
-import * as db from '../../services/db';
+import ProgressBar from '../../components/ProgressBar';
+import GoalDetailModal from '../../components/GoalDetailModal';
 
-// ==== 雲端 function URL（你的 project-ref 已恢復：baygppmzqzisddezwyrs）====
-const FUNC_URL = 'https://baygppmzqzisddezwyrs.functions.supabase.co/breakdown';
-
-// 如果未來你把雲端 function 打開 JWT 驗證（沒用 --no-verify-jwt），把 NEED_AUTH 改為 true，並帶上 anon key。
-const NEED_AUTH = false; // 目前我們不需要驗證
-const ANON_KEY = '<your-anon-key-if-needed>'; // 需要驗證時才填
-
-// 用雲端 function 產生子目標（之後要換成真 AI 也只要改後端即可） 
-async function realAIBreakdown(goalTitle, etaDays) {
-  const res = await fetch(FUNC_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(NEED_AUTH ? { Authorization: `Bearer ${ANON_KEY}` } : {}),
-    },
-    body: JSON.stringify({ title: goalTitle, etaDays }),
-  });
-
-  if (!res.ok) {
-    // Fallback：失敗時也能繼續開發
-    const now = Date.now();
-    return [
-      { id: `${now}-1`, title: `Plan for "${goalTitle}"`, isDone: false, order: 1 },
-      { id: `${now}-2`, title: 'Weekly schedule', isDone: false, order: 2 },
-      { id: `${now}-3`, title: 'First milestone', isDone: false, order: 3 },
-    ];
-  }
-  return res.json();
-}
-
-// 主頁面組件
 export default function MainScreen({ navigation }) {
-  // 從 GoalsContext 中取得目標列表與操作方法
-  const { goals, addGoal, removeGoal, updateGoal } = useGoals();
+  const [goals, setGoals] = useState([]);
+  const [subgoals, setSubgoals] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // 本地狀態：控制新增/編輯目標的彈窗
+  // 編輯用 state
   const [modalVisible, setModalVisible] = useState(false);
-  const [mode, setMode] = useState('add'); // 'add' 或 'edit'
   const [editingId, setEditingId] = useState(null);
   const [title, setTitle] = useState('');
   const [etaDays, setEtaDays] = useState('');
-  const [saving, setSaving] = useState(false); // 存檔中狀態（用於按鈕 loading/禁用）
+  const [saving, setSaving] = useState(false);
 
-  // 假 AI（保留你的註解）
-  async function fakeAIBreakdown(goalTitle) {
-    const base = [
-      `Research plan for "${goalTitle}"`,
-      'Define weekly milestones',
-      'Schedule review sessions',
-      'Prepare resources / materials',
-      'Set up progress tracking routine',
-    ];
-    const count = 3 + Math.floor(Math.random() * 2); // 3~4 個
-    const now = Date.now();
-    return Array.from({ length: count }).map((_, i) => ({
-      id: `${now}-${i + 1}`,
-      title: base[i],
-      isDone: false,
-      order: i + 1,
-    }));
-  }
+  // 詳細檢視 modal
+  const [selected, setSelected] = useState(null);
+  const [plan, setPlan] = useState([]);
 
-  // 開啟「新增目標」模式
-  const openAdd = () => {
-    setMode('add'); setEditingId(null); setTitle(''); setEtaDays(''); setModalVisible(true);
+  useEffect(() => {
+    fetchGoals();
+  }, []);
+
+  // 🧩 抓 goals 與 subgoals
+  const fetchGoals = async () => {
+    setLoading(true);
+    try {
+      const { data: g } = await supabase.from('goals').select('*').order('created_at', { ascending: false });
+      const { data: s } = await supabase.from('subgoals').select('*');
+      setGoals(g || []);
+      setSubgoals(s || []);
+    } catch (e) {
+      console.error('[fetchGoals]', e);
+      Alert.alert('Error fetching goals');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // 開啟「編輯目標」模式，並填入該目標的現有資料
+  // 🧠 開啟詳細檢視：整理 AI 拆解的 phase 結構
+  const openDetail = (goal) => {
+    const list = subgoals.filter((s) => s.goal_id === goal.id);
+    const grouped = list.reduce((acc, cur) => {
+      if (!acc[cur.phase_number]) {
+        acc[cur.phase_number] = {
+          phase_no: cur.phase_number,
+          title: cur.phase_name || `Phase ${cur.phase_number}`,
+          subgoals: [],
+        };
+      }
+      acc[cur.phase_number].subgoals.push({ title: cur.subgoal_title });
+      return acc;
+    }, {});
+    setPlan(Object.values(grouped));
+    setSelected(goal);
+  };
+
+  // ✏️ 編輯按鈕
   const openEdit = (goal) => {
-    setMode('edit'); setEditingId(goal.id);
-    setTitle(goal.title); setEtaDays(String(goal.etaDays ?? ''));
+    setEditingId(goal.id);
+    setTitle(goal.title || '');
+    setEtaDays(goal.eta_days != null ? String(goal.eta_days) : '');
     setModalVisible(true);
   };
 
-  // 儲存目標（新增或更新）
-  const saveGoal = async () => {
+  // 💾 儲存編輯
+  const saveEdit = async () => {
     const trimmed = title.trim();
     if (!trimmed) {
-      if (Platform.OS === 'web') alert('請輸入目標名稱'); else Alert.alert('請輸入目標名稱');
+      Alert.alert('請輸入目標名稱');
       return;
     }
-    // 處理 ETA 天數（允許留空）
-    const eta = etaDays === '' ? undefined : Math.max(0, parseInt(etaDays, 10) || 0);
+    const eta = etaDays === '' ? null : Math.max(0, parseInt(etaDays, 10) || 0);
 
-    if (mode === 'add') {
-      try {
-        setSaving(true);
-
-        // ADD: 取得目前登入 user（RLS 需要）
-        const { data, error } = await supabase.auth.getUser();
-        if (error) throw error;
-        const user = data?.user;
-        if (!user) {
-          if (Platform.OS === 'web') alert('尚未登入'); else Alert.alert('尚未登入');
-          return;
-        }
-
-        // Phase 3：用「假 AI」產生 subgoals（之後可替換為 fetch 後端）
-        // ⚠️ 改為呼叫雲端 function：如要回退本地假資料，將下一行改回 fakeAIBreakdown(trimmed)
-        const subgoals = await realAIBreakdown(trimmed, eta);
-
-        // ADD: 先建立 DB goal（回傳含有 uuid 的新 row）
-        const g = await db.createGoal(user.id, trimmed, eta ?? 30);
-
-        // ADD: 寫入 subgoals 到 DB
-        await db.insertSubgoals(g.id, subgoals);
-
-        // ADD: 更新前端 state（用 DB 的 id）
-        addGoal({ ...g, subgoals });
-      } catch (e) {
-        console.log('[saveGoal:add] error', e);
-        if (Platform.OS === 'web') alert(String(e)); else Alert.alert('錯誤', String(e));
-      } finally {
-        setSaving(false);
-      }
-    } else if (mode === 'edit' && editingId) {
-      try {
-        // ADD: 先更新 DB
-        await db.updateGoal(editingId, { title: trimmed, eta_days: eta });
-        // 更新畫面
-        updateGoal(editingId, (g) => ({ ...g, title: trimmed, etaDays: eta ?? g.etaDays }));
-      } catch (e) {
-        console.log('[saveGoal:edit] error', e);
-        if (Platform.OS === 'web') alert(String(e)); else Alert.alert('錯誤', String(e));
-      }
+    try {
+      setSaving(true);
+      await supabase.from('goals').update({ title: trimmed, eta_days: eta }).eq('id', editingId);
+      setGoals((prev) =>
+        prev.map((g) => (g.id === editingId ? { ...g, title: trimmed, eta_days: eta } : g))
+      );
+      setModalVisible(false);
+    } catch (e) {
+      console.log('[saveEdit] error', e);
+      Alert.alert('錯誤', String(e));
+    } finally {
+      setSaving(false);
     }
-
-    // 關閉 modal 並重置表單
-    setModalVisible(false); setEditingId(null); setTitle(''); setEtaDays('');
   };
 
-  // 刪除目標
+  // 🗑 刪除目標
   const deleteGoal = async (id) => {
-    const doDelete = async () => {
+    const go = async () => {
       try {
-        // ADD: 刪 DB（subgoals 會因 FK on delete cascade 一併刪）
-        await db.deleteGoal(id);
-        // 更新畫面
-        removeGoal(id);
+        await supabase.from('goals').delete().eq('id', id);
+        setGoals((prev) => prev.filter((g) => g.id !== id));
       } catch (e) {
-        console.log('[deleteGoal] error', e);
-        if (Platform.OS === 'web') alert(String(e)); else Alert.alert('刪除失敗', String(e));
+        Alert.alert('刪除失敗', String(e));
       }
     };
 
     if (Platform.OS === 'web') {
-      const ok = window.confirm?.('確定要刪除這個目標嗎？');
-      if (ok) await doDelete();
+      if (window.confirm?.('確定要刪除這個目標嗎？')) await go();
     } else {
       Alert.alert('刪除目標', '確定要刪除嗎？', [
         { text: '取消' },
-        { text: '刪除', style: 'destructive', onPress: () => doDelete() },
+        { text: '刪除', style: 'destructive', onPress: () => go() },
       ]);
     }
   };
 
-  // 渲染目標卡片
+  // 📊 計算子目標完成率
+  const calcProgress = (goalId) => {
+    const list = subgoals.filter((s) => s.goal_id === goalId);
+    if (!list.length) return 0;
+    const done = list.filter((s) => s.status === 'done').length;
+    return done / list.length;
+  };
+
   const renderItem = ({ item }) => (
-    <TouchableOpacity
-      onPress={() => navigation.navigate('GoalDetail', { goalId: item.id })} // 點擊進入詳情頁
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity onPress={() => openDetail(item)} activeOpacity={0.8}>
       <View style={styles.card}>
-        {/* 左側：目標標題與進度 */}
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{item.title}</Text>
           <Text style={styles.meta}>
-            Progress: {calcProgress(item)}% • ETA: {item.etaDays} days
+            ETA: {item.eta_days ?? '-'} days • {item.category || 'Uncategorized'}
           </Text>
+          <ProgressBar progress={calcProgress(item.id)} />
         </View>
-        {/* 右側：編輯與刪除按鈕 */}
         <View style={styles.actions}>
           <TouchableOpacity onPress={() => openEdit(item)} style={styles.actionBtn}>
             <Text style={styles.actionTxt}>Edit</Text>
@@ -193,25 +145,32 @@ export default function MainScreen({ navigation }) {
     </TouchableOpacity>
   );
 
+  const handleSubgoalStatusChange = (goalId, subgoalId, newStatus) => {
+    setSubgoals((prev) =>
+      prev.map((s) =>
+        s.id === subgoalId ? { ...s, status: newStatus } : s
+      )
+    );
+  };
+
+  if (loading) return <ActivityIndicator style={{ marginTop: 40 }} />;
+
   return (
     <View style={styles.container}>
-      {/* 新增目標按鈕 */}
       <Button title="+ Add Goal" onPress={() => navigation.navigate('CreateGoalFlow')} />
-
-      {/* 目標清單 */}
       <FlatList
         data={goals}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
         style={{ marginTop: 12 }}
         ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 20 }}>尚無目標</Text>}
       />
 
-      {/* 新增/編輯目標的彈窗表單 */}
+      {/* 編輯目標 Modal */}
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{mode === 'add' ? 'New Goal' : 'Edit Goal'}</Text>
+            <Text style={styles.modalTitle}>Edit Goal</Text>
             <TextInput
               placeholder="Goal title"
               value={title}
@@ -227,18 +186,26 @@ export default function MainScreen({ navigation }) {
             />
             <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
               <Button title="Cancel" onPress={() => setModalVisible(false)} />
-              <Button title={saving ? 'Saving...' : 'Save'} onPress={saveGoal} disabled={saving} />
+              <Button title={saving ? 'Saving...' : 'Save'} onPress={saveEdit} disabled={saving} />
             </View>
           </View>
         </View>
       </Modal>
+      
+
+      {/* 詳細計畫檢視 */}
+      <GoalDetailModal
+        visible={!!selected}
+        title={selected?.title}
+        plan={plan}
+        onClose={() => setSelected(null)}
+      />
     </View>
   );
 }
 
-// 樣式設定
 const styles = StyleSheet.create({
-  container: { padding: 16, flex: 1 },
+  container: { padding: 16, flex: 1, backgroundColor: '#fff' },
   card: {
     padding: 14,
     backgroundColor: '#fff',
@@ -246,12 +213,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     elevation: 1,
     flexDirection: 'row',
-    gap: 10
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#eee',
   },
   title: { fontSize: 16, fontWeight: '600' },
   meta: { marginTop: 6, color: '#666' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  actionBtn: { paddingVertical: 6, paddingHorizontal: 10, backgroundColor: '#f2f2f2', borderRadius: 8 },
+  actionBtn: { paddingVertical: 6, paddingHorizontal: 10, backgroundColor: '#f5f5f5', borderRadius: 8 },
   actionTxt: { fontWeight: '600' },
   modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'center', padding: 16 },
   modalCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16 },

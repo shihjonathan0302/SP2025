@@ -49,6 +49,7 @@
     "expo-notifications": "~0.32.12",
     "expo-status-bar": "~3.0.8",
     "lodash": "^4.17.21",
+    "lucide-react-native": "^0.546.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-easy-crop": "^5.5.1",

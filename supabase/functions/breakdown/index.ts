@@ -1,185 +1,142 @@
 // supabase/functions/breakdown/index.ts
-// Deno / Supabase Edge Function with Gemini 1.5 Flash + CORS
+// ✅ Futra Gemini Breakdown Function (Production Clean Version)
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
-// --- CORS 共用表頭 ---
 const corsHeaders: HeadersInit = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
   "access-control-allow-methods": "POST, OPTIONS",
 };
 
-// --- 工具：安全回傳 JSON + CORS ---
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      ...corsHeaders,
-      "content-type": "application/json; charset=utf-8",
-    },
+    headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
   });
 }
 
-// --- 解析 Gemini 輸出成 subgoals 陣列 ---
-function parseSubgoalsTextToItems(text: string, title: string) {
-  // 把模型輸出用行分割，挑出像「1. xxx」「- xxx」「• xxx」「* xxx」等項目
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  const goalLines: string[] = [];
-  for (const l of lines) {
-    const m = l.match(/^(\d+\.\s+|\-\s+|\*\s+|•\s+)(.+)$/);
-    if (m && m[2]) {
-      goalLines.push(m[2]);
-      continue;
-    }
-    // 若行內有分號或破折號清單，嘗試再切
-    if (!m && /;|\u2022|\-/.test(l)) {
-      const parts = l.split(/;|•|\-/).map((p) => p.trim()).filter(Boolean);
-      if (parts.length > 1) {
-        goalLines.push(...parts);
-      }
-    }
-  }
-
-  // 如果沒有偵測到清單，就把整段當 1 條
-  const selected = (goalLines.length ? goalLines : [text]).slice(0, 6);
-
-  // 清理 Markdown 粗體/編號修飾
-  const clean = (s: string) =>
-    s
-      .replace(/^\*\*(.+)\*\*$/, "$1")
-      .replace(/^\*(.+)\*$/, "$1")
-      .replace(/^["“”]+|["“”]+$/g, "")
-      .replace(/^:+/, "")
-      .trim();
-
-  const now = Date.now();
-  return selected.map((t, idx) => ({
-    id: `sg-${now}-${idx + 1}`,
-    title: clean(t),
-    isDone: false,
-    order: idx + 1,
+// --- 假資料（fallback 用）---
+function fallbackItems(title: string, etaDays: number, numPhases: number) {
+  const phaseDays = Math.floor(etaDays / numPhases);
+  return Array.from({ length: numPhases }, (_, i) => ({
+    phase_no: i + 1,
+    title: `Phase ${i + 1}: Step toward "${title}"`,
+    summary: "Fallback data (Gemini unavailable)",
+    phase_days: phaseDays,
+    start_condition: "N/A",
+    end_condition: "N/A",
+    subgoals: Array.from({ length: phaseDays }, (_, d) => ({
+      day: d + 1,
+      title: `Day ${d + 1} of Phase ${i + 1}: Work on "${title}"`,
+    })),
   }));
 }
 
-// --- 呼叫 Gemini 1.5 Flash ---
-async function generateWithGemini(title: string, etaDays?: number | null) {
-  const apiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey) throw new Error("Missing GEMINI_API_KEY (set it via: supabase secrets set GEMINI_API_KEY=...)");
-
-  // 針對你的應用撰寫的 prompt（包含使用者輸入）
-  const prompt = [
-    `You're an expert goal planner. Break the goal into small, concrete, ordered action items.`,
-    `Constraints:`,
-    `- Audience: busy individual planning realistically.`,
-    `- Output: 3–6 bullet points. Each bullet must be a single action sentence.`,
-    `- Avoid fluff. No headings. No preface. No summaries.`,
-    `- Start each item with an imperative verb (e.g., "Complete", "Draft", "Schedule").`,
-    ``,
-    `Goal: "${title}"`,
-    typeof etaDays === "number" ? `Rough timeline (days): ${etaDays}` : `Timeline: not specified`,
-  ].join("\n");
-
-  const url =
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
-    encodeURIComponent(apiKey);
-
-  const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: prompt }],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 512,
-    },
-  };
-
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  if (!r.ok) {
-    const errText = await r.text().catch(() => "");
-    throw new Error(`Gemini API error: ${r.status} ${r.statusText} ${errText}`);
-  }
-
-  const json = await r.json();
-  // 典型回傳路徑：.candidates[0].content.parts[].text
-  const text =
-    json?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p?.text ?? "").join("\n").trim() ?? "";
-
-  if (!text) throw new Error("Gemini response is empty");
-
-  return text;
+// --- 輔助函式：清理 Gemini 回傳 ---
+function sanitizeGeminiText(raw: string) {
+  let cleaned = raw
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .replace(/[“”]/g, '"')
+    .replace(/[\r\n]+/g, " ")
+    .trim();
+  const match = cleaned.match(/\[[\s\S]*\]/);
+  if (match) cleaned = match[0];
+  if (!cleaned.endsWith("]")) cleaned += "]";
+  return cleaned;
 }
 
-// --- Edge Function 主處理器 ---
+// --- Gemini 呼叫 ---
+async function generateWithGemini(body: Record<string, any>) {
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) throw new Error("Missing GEMINI_API_KEY");
+
+  const { title, etaDays = 30, numPhases = 3, category, description, longTermGoal, currentLevel } = body;
+  const phaseDays = Math.floor(etaDays / numPhases);
+
+  const prompt = `
+You are a productivity planning assistant in Futra.
+Generate a structured milestone plan based on this goal context.
+
+Title: "${title}"
+Days: ${etaDays}, Phases: ${numPhases}
+Category: ${category ?? "General"}
+Description: ${description ?? "Not provided"}
+Long-term purpose: ${longTermGoal ?? "Not specified"}
+Current level: ${currentLevel ?? "Not specified"}
+
+Each phase must include:
+- phase_no, title, summary, phase_days, start_condition, end_condition
+- subgoals: daily tasks { day, title }
+
+Output valid JSON array only.
+`.trim();
+
+  const models = ["gemini-2.5-pro", "gemini-2.5-flash"];
+  let responseText = "";
+  let lastError = null;
+
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.5, maxOutputTokens: 8192 },
+        }),
+      });
+
+      const txt = await res.text();
+      if (!res.ok) {
+        lastError = txt;
+        continue;
+      }
+
+      const data = JSON.parse(txt);
+      responseText =
+        data?.candidates?.[0]?.content?.parts
+          ?.map((p: { text?: string }) => p.text ?? "")
+          .join("\n")
+          .trim() ?? "";
+
+      if (responseText) break;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (!responseText) throw new Error(`[Gemini failed] ${lastError}`);
+
+  try {
+    return JSON.parse(sanitizeGeminiText(responseText));
+  } catch (err) {
+    console.warn("[WARN] JSON parse failed:", err);
+    return [
+      { phase_no: 1, title: "Parse failed", summary: "Could not parse Gemini output", subgoals: [{ day: 1, title: responseText.slice(0, 400) }] },
+    ];
+  }
+}
+
+// --- 伺服器主流程 ---
 serve(async (req) => {
   try {
-    // 預檢
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-
     if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
 
-    let payload: { title?: unknown; etaDays?: unknown } = {};
-    try {
-      payload = await req.json();
-    } catch {
-      return json({ error: "Invalid JSON body" }, 400);
-    }
+    const body = await req.json().catch(() => ({}));
+    if (!body.title) return json({ error: "Missing 'title'" }, 400);
 
-    const titleRaw = typeof payload.title === "string" ? payload.title : "";
-    const etaRaw =
-      typeof payload.etaDays === "number"
-        ? payload.etaDays
-        : typeof payload.etaDays === "string"
-        ? Number.parseInt(payload.etaDays, 10)
-        : null;
+    const output = await generateWithGemini(body).catch((e) => {
+      console.error("[Gemini failed, using fallback]", e);
+      return fallbackItems(body.title, body.etaDays, body.numPhases);
+    });
 
-    const title = titleRaw.trim();
-    const etaDays = Number.isFinite(etaRaw as number) ? (etaRaw as number) : null;
-
-    if (!title) return json({ error: "Missing 'title' string in body" }, 400);
-
-    // 呼叫 Gemini
-    let text = "";
-    try {
-      text = await generateWithGemini(title, etaDays);
-    } catch (e) {
-      // 如果雲端模型掛了，用 fallback 以不中斷前端流程
-      console.warn("[Gemini failed]", e);
-      const now = Date.now();
-      return json([
-        { id: `sg-${now}-1`, title: `Define the plan for "${title}"`, isDone: false, order: 1 },
-        { id: `sg-${now}-2`, title: "Schedule weekly checkpoints in calendar", isDone: false, order: 2 },
-        { id: `sg-${now}-3`, title: "Complete first concrete milestone", isDone: false, order: 3 },
-      ]);
-    }
-
-    const items = parseSubgoalsTextToItems(text, title);
-
-    // 保底：至少回三條
-    if (!items.length) {
-      const now = Date.now();
-      return json([
-        { id: `sg-${now}-1`, title: `Outline steps for "${title}"`, isDone: false, order: 1 },
-        { id: `sg-${now}-2`, title: "Block time for weekly progress", isDone: false, order: 2 },
-        { id: `sg-${now}-3`, title: "Deliver first measurable result", isDone: false, order: 3 },
-      ]);
-    }
-
-    return json(items);
+    return json(output);
   } catch (err) {
-    console.error("[breakdown] fatal", err);
+    console.error("[breakdown] fatal:", err);
     return json({ error: String(err) }, 500);
   }
 });

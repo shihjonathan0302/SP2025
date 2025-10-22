@@ -9,7 +9,7 @@ const CATEGORIES = [
   { key: 'Habits and Learning', label: '📘 Habits & Learning' },
 ];
 
-export default function StepCategorySelect({ formData, updateForm, nextStep }) {
+export default function StepCategorySelect({ formData, updateFormData, nextStep }) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Select a Goal Type</Text>
@@ -23,7 +23,7 @@ export default function StepCategorySelect({ formData, updateForm, nextStep }) {
               formData.category === cat.key && styles.selected,
             ]}
             onPress={() => {
-              updateForm({ category: cat.key });
+              updateFormData({ category: cat.key });
               nextStep(); // 選好自動進入下一步
             }}
           >
