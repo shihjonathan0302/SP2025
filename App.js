@@ -1,7 +1,7 @@
 // App.js
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import { Platform, TouchableOpacity } from 'react-native';
+import { Platform, TouchableOpacity, View, TouchableWithoutFeedback } from 'react-native';
 import {
   NavigationContainer,
   getFocusedRouteNameFromRoute,
@@ -64,6 +64,41 @@ function Tabs() {
   );
 }
 
+/* ---------------- Modal 包裝：半透明背景 + 點背景關閉 ---------------- */
+function ModalCardWrapper({ navigation }) {
+  return (
+    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }}>
+      {/* 點背景就關閉 */}
+      <TouchableWithoutFeedback onPress={() => navigation.goBack()}>
+        <View style={{ flex: 1 }} />
+      </TouchableWithoutFeedback>
+
+      {/* 前景卡片 */}
+      <View
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          top: Platform.OS === 'ios' ? 80 : 60,
+          marginHorizontal: 16,
+          borderRadius: 20,
+          backgroundColor: '#fff',
+          overflow: 'hidden',
+          elevation: 6,
+          shadowColor: '#000',
+          shadowOpacity: 0.15,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 6 },
+        }}
+      >
+        {/* 把原本的 CreateGoalFlow 放進來 */}
+        <CreateGoalFlow />
+      </View>
+    </View>
+  );
+}
+
 /* ---------------- Root Stack ---------------- */
 function RootNavigator({ isSignedIn }) {
   return (
@@ -123,19 +158,46 @@ function RootNavigator({ isSignedIn }) {
                     <Ionicons name="settings-outline" size={26} color="#111827" />
                   </TouchableOpacity>
                 ),
+                // ✅ 只有在 Main（Dashboard）頁時，右上角顯示 Add Goal
+                headerRight: () =>
+                  focused === 'Main' ? (
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('CreateGoalFlow')}
+                      accessibilityRole="button"
+                      accessibilityLabel="Add goal"
+                      style={{
+                        marginRight: 15,
+                        width: 40,
+                        height: 40,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: '#E5E7EB',
+                        backgroundColor: '#FFF',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Ionicons name="add-circle-outline" size={26} color="#2563EB" />
+                    </TouchableOpacity>
+                  ) : null,
               };
             }}
           />
 
-          {/* ✅ 新增目標流程（CreateGoalFlow） */}
+          {/* ✅ 新增目標流程（以「透明 Modal」浮出） */}
           <RootJSStack.Screen
             name="CreateGoalFlow"
-            component={CreateGoalFlow}
+            component={ModalCardWrapper} // ← 用包裝實現半透明背景 + 點背景關閉
             options={{
-              headerTitle: 'New Goal',
-              headerTitleAlign: 'center',
-              gestureDirection: 'horizontal',
-              cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+              headerShown: false,
+              presentation: 'transparentModal', // 透明 modal
+              cardStyle: { backgroundColor: 'transparent' },
+              gestureEnabled: true,
+              gestureDirection: 'vertical',
+              cardStyleInterpolator:
+                Platform.OS === 'ios'
+                  ? CardStyleInterpolators.forModalPresentationIOS
+                  : CardStyleInterpolators.forFadeFromBottomAndroid,
             }}
           />
 

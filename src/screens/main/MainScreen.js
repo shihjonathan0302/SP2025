@@ -1,9 +1,10 @@
 // screens/main/MainScreen.js
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, FlatList, Button, Modal, TextInput,
+  View, Text, FlatList, Modal, TextInput,
   StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabaseClient';
 import ProgressBar from '../../components/ProgressBar';
 import GoalDetailModal from '../../components/GoalDetailModal';
@@ -28,12 +29,28 @@ export default function MainScreen({ navigation }) {
     fetchGoals();
   }, []);
 
+  // ✅ 回到畫面時自動刷新（建立/編輯後回 Main 會更新）
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchGoals();
+    }, [])
+  );
+
   // 🧩 抓 goals 與 subgoals
   const fetchGoals = async () => {
     setLoading(true);
     try {
-      const { data: g } = await supabase.from('goals').select('*').order('created_at', { ascending: false });
-      const { data: s } = await supabase.from('subgoals').select('*');
+      const { data: g, error: gErr } = await supabase
+        .from('goals')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (gErr) throw gErr;
+
+      const { data: s, error: sErr } = await supabase
+        .from('subgoals')
+        .select('*');
+      if (sErr) throw sErr;
+
       setGoals(g || []);
       setSubgoals(s || []);
     } catch (e) {
@@ -81,7 +98,12 @@ export default function MainScreen({ navigation }) {
 
     try {
       setSaving(true);
-      await supabase.from('goals').update({ title: trimmed, eta_days: eta }).eq('id', editingId);
+      const { error: upErr } = await supabase
+        .from('goals')
+        .update({ title: trimmed, eta_days: eta })
+        .eq('id', editingId);
+      if (upErr) throw upErr;
+
       setGoals((prev) =>
         prev.map((g) => (g.id === editingId ? { ...g, title: trimmed, eta_days: eta } : g))
       );
@@ -98,7 +120,8 @@ export default function MainScreen({ navigation }) {
   const deleteGoal = async (id) => {
     const go = async () => {
       try {
-        await supabase.from('goals').delete().eq('id', id);
+        const { error: delErr } = await supabase.from('goals').delete().eq('id', id);
+        if (delErr) throw delErr;
         setGoals((prev) => prev.filter((g) => g.id !== id));
       } catch (e) {
         Alert.alert('刪除失敗', String(e));
@@ -157,7 +180,7 @@ export default function MainScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Button title="+ Add Goal" onPress={() => navigation.navigate('CreateGoalFlow')} />
+      {/* ✅ Add Goal 已移到 Header 右上角 */}
       <FlatList
         data={goals}
         keyExtractor={(item) => String(item.id)}
@@ -185,13 +208,18 @@ export default function MainScreen({ navigation }) {
               style={styles.input}
             />
             <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
-              <Button title="Cancel" onPress={() => setModalVisible(false)} />
-              <Button title={saving ? 'Saving...' : 'Save'} onPress={saveEdit} disabled={saving} />
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.actionBtn}>
+                <Text style={styles.actionTxt}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={saveEdit} disabled={saving} style={styles.actionBtn}>
+                <Text style={[styles.actionTxt, { color: saving ? '#aaa' : '#111' }]}>
+                  {saving ? 'Saving...' : 'Save'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-      
 
       {/* 詳細計畫檢視 */}
       <GoalDetailModal
@@ -199,6 +227,7 @@ export default function MainScreen({ navigation }) {
         title={selected?.title}
         plan={plan}
         onClose={() => setSelected(null)}
+        onStatusChange={handleSubgoalStatusChange}
       />
     </View>
   );
