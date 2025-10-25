@@ -1,58 +1,76 @@
 // screens/createGoal/StepCategorySelect.js
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 
 const CATEGORIES = [
-  { key: 'Academic and Education', label: '🎓 Academic & Education' },
-  { key: 'Career and Professional', label: '💼 Career & Professional' },
-  { key: 'Personal and Lifestyle', label: '🌿 Personal & Lifestyle' },
-  { key: 'Habits and Learning', label: '📘 Habits & Learning' },
+  { key: 'Academic and Education', label: '🎓 Academic & Education', desc: 'Exams, research, or academic progress' },
+  { key: 'Career and Professional', label: '💼 Career & Professional', desc: 'Internships, skills, or portfolio' },
+  { key: 'Personal and Lifestyle', label: '🌿 Personal & Lifestyle', desc: 'Fitness, travel, or health goals' },
+  { key: 'Habits and Learning', label: '📘 Habits & Learning', desc: 'Daily learning or new habits' },
 ];
 
 export default function StepCategorySelect({ formData, updateFormData, nextStep }) {
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Select a Goal Type</Text>
 
-      <View style={styles.list}>
-        {CATEGORIES.map((cat) => (
+      {CATEGORIES.map((cat, idx) => {
+        const selected = formData.category === cat.key;
+        return (
           <TouchableOpacity
             key={cat.key}
-            style={[
-              styles.option,
-              formData.category === cat.key && styles.selected,
-            ]}
+            style={[styles.option, selected && styles.selected]}
             onPress={() => {
               updateFormData({ category: cat.key });
-              nextStep(); // 選好自動進入下一步
+              nextStep();
             }}
           >
-            <Text
-              style={[
-                styles.label,
-                formData.category === cat.key && { color: '#fff' },
-              ]}
-            >
-              {cat.label}
-            </Text>
+            <Text style={[styles.label, selected && { color: '#2563EB' }]}>{cat.label}</Text>
+            <Text style={[styles.desc, selected && { color: '#1D4ED8' }]}>{cat.desc}</Text>
           </TouchableOpacity>
-        ))}
-      </View>
-    </View>
+        );
+      })}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: '700', marginBottom: 20 },
-  list: { width: '100%', gap: 12 },
-  option: {
-    backgroundColor: '#f2f2f2',
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 12,
-    marginHorizontal: 20,
+  container: {
+    padding: 24,
+    gap: 14,
+    backgroundColor: '#F9FAFB',
   },
-  selected: { backgroundColor: '#4a90e2' },
-  label: { fontSize: 16, fontWeight: '600', textAlign: 'center' },
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  option: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  selected: {
+    borderColor: '#2563EB',
+    backgroundColor: '#EFF6FF',
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    color: '#111827',
+  },
+  desc: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
 });

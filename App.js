@@ -1,7 +1,13 @@
 // App.js
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import { Platform, TouchableOpacity, View, TouchableWithoutFeedback } from 'react-native';
+import {
+  Platform,
+  TouchableOpacity,
+  View,
+  Pressable,
+  ScrollView,
+} from 'react-native';
 import {
   NavigationContainer,
   getFocusedRouteNameFromRoute,
@@ -64,36 +70,51 @@ function Tabs() {
   );
 }
 
-/* ---------------- Modal 包裝：半透明背景 + 點背景關閉 ---------------- */
+/* ---------------- Modal 包裝：穩定自適應高度 + 點背景關閉 ---------------- */
 function ModalCardWrapper({ navigation }) {
   return (
-    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }}>
-      {/* 點背景就關閉 */}
-      <TouchableWithoutFeedback onPress={() => navigation.goBack()}>
-        <View style={{ flex: 1 }} />
-      </TouchableWithoutFeedback>
-
-      {/* 前景卡片 */}
-      <View
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      {/* 背景遮罩：點擊關閉 */}
+      <Pressable
+        onPress={() => navigation.goBack()}
         style={{
           position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          top: Platform.OS === 'ios' ? 80 : 60,
-          marginHorizontal: 16,
-          borderRadius: 20,
+          inset: 0,
+        }}
+      />
+
+      {/* 浮動卡片：置中，寬度自適應，最大高度 85%，內容可捲動 */}
+      <View
+        style={{
+          width: '92%',
+          maxWidth: 650,
+          borderRadius: 24,
           backgroundColor: '#fff',
           overflow: 'hidden',
-          elevation: 6,
+          paddingVertical: 20,
+          paddingHorizontal: 16,
+          elevation: 8,
           shadowColor: '#000',
           shadowOpacity: 0.15,
           shadowRadius: 12,
           shadowOffset: { width: 0, height: 6 },
+          maxHeight: '85%',
         }}
       >
-        {/* 把原本的 CreateGoalFlow 放進來 */}
-        <CreateGoalFlow />
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator
+          contentContainerStyle={{ paddingBottom: 8 }}
+        >
+          <CreateGoalFlow />
+        </ScrollView>
       </View>
     </View>
   );
@@ -112,7 +133,6 @@ function RootNavigator({ isSignedIn }) {
     >
       {isSignedIn ? (
         <>
-          {/* ✅ 主頁（含 Dashboard、Reports、Community Tabs） */}
           <RootJSStack.Screen
             name="RootTabs"
             component={Tabs}
@@ -158,7 +178,6 @@ function RootNavigator({ isSignedIn }) {
                     <Ionicons name="settings-outline" size={26} color="#111827" />
                   </TouchableOpacity>
                 ),
-                // ✅ 只有在 Main（Dashboard）頁時，右上角顯示 Add Goal
                 headerRight: () =>
                   focused === 'Main' ? (
                     <TouchableOpacity
@@ -184,13 +203,13 @@ function RootNavigator({ isSignedIn }) {
             }}
           />
 
-          {/* ✅ 新增目標流程（以「透明 Modal」浮出） */}
+          {/* 使用穩定版浮動 Modal */}
           <RootJSStack.Screen
             name="CreateGoalFlow"
-            component={ModalCardWrapper} // ← 用包裝實現半透明背景 + 點背景關閉
+            component={ModalCardWrapper}
             options={{
               headerShown: false,
-              presentation: 'transparentModal', // 透明 modal
+              presentation: 'transparentModal',
               cardStyle: { backgroundColor: 'transparent' },
               gestureEnabled: true,
               gestureDirection: 'vertical',
@@ -201,7 +220,6 @@ function RootNavigator({ isSignedIn }) {
             }}
           />
 
-          {/* ✅ 目標詳情頁 */}
           <RootJSStack.Screen
             name="GoalDetail"
             component={GoalDetailScreen}
@@ -213,7 +231,6 @@ function RootNavigator({ isSignedIn }) {
             }}
           />
 
-          {/* ✅ 設定頁面（子堆疊） */}
           <RootJSStack.Screen
             name="Settings"
             component={SettingsStackNavigator}
@@ -251,7 +268,6 @@ export default function App() {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [checking, setChecking] = useState(true);
 
-  /* ✅ 初始化 Supabase Auth */
   useEffect(() => {
     supabase.auth.getSession().then(({ data, error }) => {
       console.log('[getSession]', { hasSession: !!data?.session, error: error?.message });
@@ -267,7 +283,6 @@ export default function App() {
     return () => sub?.subscription?.unsubscribe?.();
   }, []);
 
-  /* ✅ 通知權限註冊 */
   useEffect(() => {
     async function registerForPushNotificationsAsync() {
       if (Platform.OS === 'web') return;
