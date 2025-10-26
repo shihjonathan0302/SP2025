@@ -6,7 +6,9 @@ import {
   TouchableOpacity,
   View,
   Pressable,
+  Keyboard,
   ScrollView,
+  TouchableWithoutFeedback
 } from 'react-native';
 import {
   NavigationContainer,
@@ -63,8 +65,8 @@ function Tabs() {
         },
       })}
     >
-      <Tab.Screen name="Main" component={MainScreen} />
       <Tab.Screen name="Reports" component={ReportsStackNavigator} />
+      <Tab.Screen name="Main" component={MainScreen} />
       <Tab.Screen name="Community" component={CommunityScreen} />
     </Tab.Navigator>
   );
@@ -72,50 +74,65 @@ function Tabs() {
 
 /* ---------------- Modal 包裝：穩定自適應高度 + 點背景關閉 ---------------- */
 function ModalCardWrapper({ navigation }) {
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  // 監聽鍵盤狀態
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // ✅ 改良邏輯：有鍵盤 → 先收鍵盤；沒有鍵盤 → 關視窗
+  const handleBackgroundPress = () => {
+    if (keyboardVisible) {
+      Keyboard.dismiss();
+    } else {
+      navigation.goBack();
+    }
+  };
+
   return (
     <View
       style={{
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.35)',
+        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'center',
         alignItems: 'center',
       }}
     >
-      {/* 背景遮罩：點擊關閉 */}
-      <Pressable
-        onPress={() => navigation.goBack()}
-        style={{
-          position: 'absolute',
-          inset: 0,
-        }}
-      />
+      {/* 背景遮罩 */}
+      <Pressable onPress={handleBackgroundPress} style={{ position: 'absolute', inset: 0 }} />
 
-      {/* 浮動卡片：置中，寬度自適應，最大高度 85%，內容可捲動 */}
-      <View
-        style={{
-          width: '92%',
-          maxWidth: 650,
-          borderRadius: 24,
-          backgroundColor: '#fff',
-          overflow: 'hidden',
-          paddingVertical: 20,
-          paddingHorizontal: 16,
-          elevation: 8,
-          shadowColor: '#000',
-          shadowOpacity: 0.15,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: 6 },
-          maxHeight: '85%',
-        }}
-      >
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator
-          contentContainerStyle={{ paddingBottom: 8 }}
+      {/* 浮動卡片 */}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View
+          style={{
+            width: '84%',
+            maxWidth: 640,
+            borderRadius: 22,
+            backgroundColor: '#FFFFFF',
+            elevation: 10,
+            shadowColor: '#000',
+            shadowOpacity: 0.18,
+            shadowRadius: 14,
+            shadowOffset: { width: 0, height: 8 },
+            maxHeight: '86%',
+            overflow: 'hidden',
+          }}
         >
-          <CreateGoalFlow />
-        </ScrollView>
-      </View>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{}}
+          >
+            <CreateGoalFlow />
+          </ScrollView>
+        </View>
+      </TouchableWithoutFeedback>
     </View>
   );
 }
