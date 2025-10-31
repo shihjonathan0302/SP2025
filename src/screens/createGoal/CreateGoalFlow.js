@@ -8,6 +8,7 @@ import StepCommon_Page3 from './StepCommon_Page3';
 import StepCategoryFields from './StepCategoryFields';
 import StepReview from './StepReview';
 import StepResult from './StepResult';
+import StepDetailsUnified from './StepDetailsUnified';
 
 export default function CreateGoalFlow({ navigation }) {
   const [formData, setFormData] = useState({
@@ -28,8 +29,7 @@ export default function CreateGoalFlow({ navigation }) {
     StepCategorySelect,
     StepCommon_Page1,
     StepCommon_Page2,
-    StepCommon_Page3,
-    StepCategoryFields,
+    StepDetailsUnified,
     StepReview,
     StepResult,
   ];

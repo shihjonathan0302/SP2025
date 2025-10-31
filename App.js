@@ -53,6 +53,7 @@ const RootJSStack = createStackNavigator();
 function Tabs() {
   return (
     <Tab.Navigator
+      initialRouteName='Main'
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: false,
