@@ -4,11 +4,11 @@ import { Animated, Easing, StyleSheet, View, Text } from 'react-native';
 import StepCategorySelect from './StepCategorySelect';
 import StepCommon_Page1 from './StepCommon_Page1';
 import StepCommon_Page2 from './StepCommon_Page2';
-import StepCommon_Page3 from './StepCommon_Page3';
 import StepCategoryFields from './StepCategoryFields';
 import StepReview from './StepReview';
 import StepResult from './StepResult';
-import StepDetailsUnified from './StepDetailsUnified';
+import StepDetails_Page1 from './StepDetails_Page1';
+import StepDetails_Page2 from './StepDetails_Page2';
 
 export default function CreateGoalFlow({ navigation }) {
   const [formData, setFormData] = useState({
@@ -29,7 +29,8 @@ export default function CreateGoalFlow({ navigation }) {
     StepCategorySelect,
     StepCommon_Page1,
     StepCommon_Page2,
-    StepDetailsUnified,
+    StepDetails_Page1,
+    StepDetails_Page2,
     StepReview,
     StepResult,
   ];

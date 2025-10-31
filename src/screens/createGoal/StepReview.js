@@ -3,20 +3,18 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  Button,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
   Alert,
-  Platform,
+  TouchableOpacity,
 } from 'react-native';
 import { supabase } from '../../lib/supabaseClient';
-import StepResult from './StepResult'; // ✅ 新增結果畫面整合
+import StepResult from './StepResult';
 
-// ✅ Supabase Edge Function 雲端 URL
 const FUNC_URL = 'https://baygppmzqzisddezwyrs.functions.supabase.co/breakdown';
 
-/** 組合結構化 JSON prompt（提供給 Gemini） */
+/* 🧩 組合傳給 AI 的 Payload */
 function buildGoalPayload(formData) {
   const start = formData.startDate instanceof Date ? formData.startDate : new Date();
   const target = formData.targetDate instanceof Date ? formData.targetDate : new Date();
@@ -35,7 +33,7 @@ function buildGoalPayload(formData) {
   };
 }
 
-/** 呼叫 Gemini Edge Function */
+/* 🧠 呼叫 Supabase Edge Function */
 async function callAI(payload) {
   const res = await fetch(FUNC_URL, {
     method: 'POST',
@@ -50,7 +48,7 @@ async function callAI(payload) {
   return res.json();
 }
 
-/** 計算天數差 */
+/* 📆 計算天數差 */
 function diffDays(a, b) {
   try {
     const ms = b.getTime() - a.getTime();
@@ -74,7 +72,7 @@ export default function StepReview({ formData, prevStep, goBackToMain }) {
       console.log('[Sending to Gemini]', payload);
       const data = await callAI(payload);
       setAiPlan(data);
-      setShowResult(true); // ✅ 顯示結果畫面
+      setShowResult(true);
     } catch (err) {
       console.error('[AI Error]', err);
       Alert.alert('AI Error', err.message);
@@ -97,7 +95,6 @@ export default function StepReview({ formData, prevStep, goBackToMain }) {
       const target = formData.targetDate instanceof Date ? formData.targetDate : new Date();
       const days = diffDays(start, target);
 
-      // 1️⃣ 插入目標主檔
       const insertGoal = {
         user_id: userId,
         title: formData.title,
@@ -117,7 +114,7 @@ export default function StepReview({ formData, prevStep, goBackToMain }) {
       const goalId = goals?.[0]?.id;
       if (!goalId) throw new Error('Failed to create goal.');
 
-      // 2️⃣ 插入子目標
+      // 插入子目標
       const subInserts = [];
       for (const phase of aiPlan) {
         for (const s of phase.subgoals || []) {
@@ -146,7 +143,7 @@ export default function StepReview({ formData, prevStep, goBackToMain }) {
     }
   };
 
-  // ✅ 切換到結果畫面
+  /* 🎯 如果已生成 AI 結果 → 顯示結果頁 */
   if (showResult && aiPlan) {
     return (
       <StepResult
@@ -157,41 +154,113 @@ export default function StepReview({ formData, prevStep, goBackToMain }) {
     );
   }
 
-  // ✅ 預設畫面：回顧目標、產生 AI 計畫
+  /* 🧭 預設畫面：回顧 + 生成 */
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Review & Generate AI Plan</Text>
+      <Text style={styles.title}>Review Your Goal</Text>
+      <Text style={styles.subtitle}>Check the details before generating your AI plan.</Text>
 
-      <View style={styles.section}>
+      <View style={styles.card}>
         <Text style={styles.label}>Category</Text>
-        <Text>{formData.category || '-'}</Text>
+        <Text style={styles.value}>{formData.category || '-'}</Text>
 
         <Text style={styles.label}>Goal Name</Text>
-        <Text>{formData.title || '-'}</Text>
+        <Text style={styles.value}>{formData.title || '-'}</Text>
 
         <Text style={styles.label}>Description</Text>
-        <Text>{formData.description || '-'}</Text>
+        <Text style={styles.value}>{formData.description || '-'}</Text>
+
+        <Text style={styles.label}>Motivation</Text>
+        <Text style={styles.value}>{formData.motivation || '-'}</Text>
 
         <Text style={styles.label}>Phases</Text>
-        <Text>{formData.numPhases || 3}</Text>
+        <Text style={styles.value}>{formData.numPhases || 3}</Text>
       </View>
 
-      {!aiPlan && !loading && (
-        <Button title="🧠 Generate AI Breakdown" onPress={handleGeneratePlan} />
+      {loading ? (
+        <ActivityIndicator size="large" color="#2563EB" style={{ marginVertical: 20 }} />
+      ) : (
+        <TouchableOpacity style={styles.mainBtn} onPress={handleGeneratePlan}>
+          <Text style={styles.mainBtnText}>🧠 Generate AI Breakdown</Text>
+        </TouchableOpacity>
       )}
-      {loading && <ActivityIndicator style={{ marginVertical: 10 }} />}
 
       <View style={styles.navBtns}>
-        <Button title="← Back" onPress={prevStep} />
+        <TouchableOpacity style={styles.backBtn} onPress={prevStep}>
+          <Text style={styles.backBtnText}>← Back</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
 }
 
+/* 🎨 Styles */
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 20, backgroundColor: '#fff' },
-  title: { fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 20 },
-  section: { marginBottom: 20 },
-  label: { fontWeight: '600', marginTop: 8, color: '#444' },
-  navBtns: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  container: {
+    flexGrow: 1,
+    padding: 20,
+    backgroundColor: '#F9FAFB',
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    marginBottom: 22,
+  },
+  label: {
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  value: {
+    color: '#111827',
+    fontSize: 15,
+  },
+  mainBtn: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  mainBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  navBtns: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  backBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    backgroundColor: '#E5E7EB',
+  },
+  backBtnText: {
+    color: '#111827',
+    fontWeight: '600',
+    fontSize: 15,
+  },
 });
