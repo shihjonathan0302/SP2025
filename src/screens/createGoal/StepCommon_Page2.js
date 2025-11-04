@@ -39,7 +39,9 @@ export default function StepCommon_Page2({ formData, updateFormData, goNextPage,
 
       {/* Phases with slider (1~5) */}
       <Text style={[styles.label, { marginTop: 8 }]}>Number of Phases</Text>
-      <Text style={styles.hint}>Drag the slider • Some users prefer a single phase</Text>
+      <Text style={styles.hint}>
+        A phase represents one major stage of your goal — for example: “Preparation”, “Execution”, or “Review”
+      </Text>
 
       <View style={{ paddingHorizontal: 6, marginTop: 6 }}>
         <Slider
