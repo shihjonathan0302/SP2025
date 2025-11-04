@@ -8,7 +8,8 @@ import StepReview from './StepReview';
 import StepResult from './StepResult';
 import StepInsights_Page1 from './StepInsights_Page1';
 import StepInsights_Page2 from './StepInsights_Page2.js';
-import StepDetails_Page2 from './StepDetails_Page2';
+import StepDetails_Page2 from './StepCategoryDetails_Page2';
+import StepDetails_Page1 from './StepCategoryDetails_Page1';
 
 export default function CreateGoalFlow({ navigation }) {
   const [formData, setFormData] = useState({
@@ -31,6 +32,7 @@ export default function CreateGoalFlow({ navigation }) {
     StepCommon_Page2,
     StepInsights_Page1,
     StepInsights_Page2,
+    StepDetails_Page1,
     StepDetails_Page2,
     StepReview,
     StepResult,
