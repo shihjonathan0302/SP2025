@@ -39,34 +39,49 @@ function Section({ title, subtitle, children }) {
 /* ---------- 環境依類別 ---------- */
 const ENV_BY_CAT = {
   'Academic and Education': [
-    { key: 'home', label: 'Home' },
-    { key: 'library', label: 'Library' },
-    { key: 'study_room', label: 'Study room' },
-    { key: 'pc_required', label: 'PC required' },
-    { key: 'offline_ok', label: 'Offline ok' },
+    { key: 'home', label: 'Home or dorm' },
+    { key: 'library', label: 'Library / Study hall' },
+    { key: 'study_room', label: 'Quiet study room' },
+    { key: 'campus', label: 'Campus / Lab' },
+    { key: 'cafe', label: 'Café / Public space' },
+    { key: 'group_space', label: 'Group work space' },
+    { key: 'pc_required', label: 'PC / Laptop required' },
+    { key: 'mobile_ok', label: 'Mobile friendly' },
+    { key: 'offline_ok', label: 'Offline materials ok' },
     { key: 'other', label: 'Other' },
   ],
   'Career and Professional': [
-    { key: 'home', label: 'Home' },
-    { key: 'cowork', label: 'Cowork space' },
-    { key: 'office', label: 'Office-like' },
-    { key: 'pc_required', label: 'PC required' },
-    { key: 'interview_env', label: 'Interview env' },
+    { key: 'office', label: 'Office / Corporate setting' },
+    { key: 'remote', label: 'Remote / Home office' },
+    { key: 'cowork', label: 'Coworking space' },
+    { key: 'meeting_room', label: 'Meeting / Interview room' },
+    { key: 'project_lab', label: 'Project lab / Studio' },
+    { key: 'fieldwork', label: 'Field / Client site' },
+    { key: 'pc_required', label: 'PC / Laptop required' },
+    { key: 'mobile_ok', label: 'Mobile tools ok' },
     { key: 'other', label: 'Other' },
   ],
   'Personal and Lifestyle': [
     { key: 'home', label: 'Home' },
-    { key: 'outdoor', label: 'Outdoor' },
-    { key: 'kitchen', label: 'Kitchen' },
-    { key: 'finance_tools', label: 'Finance tools' },
+    { key: 'outdoor', label: 'Outdoor / Nature' },
+    { key: 'gym', label: 'Gym / Training area' },
+    { key: 'kitchen', label: 'Kitchen / Home lab' },
+    { key: 'workspace', label: 'Workspace / Desk area' },
+    { key: 'travel', label: 'Travel / Public area' },
+    { key: 'finance_tools', label: 'Finance or tracking tools' },
+    { key: 'mobile_ok', label: 'Mobile friendly' },
     { key: 'other', label: 'Other' },
   ],
   'Habits and Learning': [
     { key: 'home', label: 'Home' },
-    { key: 'library', label: 'Library' },
-    { key: 'music_room', label: 'Music room' },
-    { key: 'pc_required', label: 'PC required' },
-    { key: 'mobile_ok', label: 'Mobile ok' },
+    { key: 'library', label: 'Library / Study area' },
+    { key: 'studio', label: 'Music / Art studio' },
+    { key: 'classroom', label: 'Classroom / Course site' },
+    { key: 'outdoor', label: 'Outdoor / On the go' },
+    { key: 'cafe', label: 'Café / Shared space' },
+    { key: 'pc_required', label: 'PC / Laptop required' },
+    { key: 'mobile_ok', label: 'Mobile friendly' },
+    { key: 'offline_ok', label: 'Offline ok' },
     { key: 'other', label: 'Other' },
   ],
 };
@@ -119,7 +134,7 @@ export default function StepInsights_Page2({ formData, updateFormData, goPrevPag
       <Section title={`Available time: ${hoursPerWeek.toFixed(1)} h / week`}>
         <Slider
           minimumValue={0.5}
-          maximumValue={30}
+          maximumValue={60}
           step={0.5}
           value={hoursPerWeek}
           onValueChange={setHoursPerWeek}
@@ -194,20 +209,7 @@ export default function StepInsights_Page2({ formData, updateFormData, goPrevPag
         )}
       </Section>
 
-      {/* Additional Information */}
-      <Section
-        title="Additional information (optional)"
-        subtitle="Anything else that would help us plan?"
-      >
-        <TextInput
-          style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
-          placeholder="Constraints, schedules, tools you prefer..."
-          placeholderTextColor="#9CA3AF"
-          multiline
-          value={additionalInfo}
-          onChangeText={setAdditionalInfo}
-        />
-      </Section>
+      
 
       {/* Navigation */}
       <View style={styles.navRow}>

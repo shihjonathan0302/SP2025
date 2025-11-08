@@ -1,0 +1,1 @@
+// additional information for the goal category "Notes"
