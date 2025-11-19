@@ -1,258 +1,411 @@
 // screens/main/MainScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, FlatList, Modal, TextInput,
-  StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { supabase } from '../../lib/supabaseClient';
-import ProgressBar from '../../components/ProgressBar';
-import GoalDetailModal from '../../components/GoalDetailModal';
+import { Calendar } from 'react-native-calendars';
+import * as db from '../../services/db';
 
-export default function MainScreen({ navigation }) {
-  const [goals, setGoals] = useState([]);
-  const [subgoals, setSubgoals] = useState([]);
+/* 小工具：今天 YYYY-MM-DD */
+function todayYMD() {
+  const d = new Date();
+  return d.toISOString().slice(0, 10);
+}
+
+/* 小工具：格式化日期 → Wed Nov 19 2025 */
+function formatHeaderDate(ymd) {
+  try {
+    const d = new Date(ymd);
+    if (Number.isNaN(d.getTime())) return ymd;
+    return d.toDateString();
+  } catch {
+    return ymd;
+  }
+}
+
+/* 小工具：這一天相對於今天的文字（Today / Tomorrow / 2 days ago ...） */
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+function relativeLabel(ymd) {
+  try {
+    const today = new Date(todayYMD());
+    const target = new Date(ymd);
+    const diff = Math.round((target - today) / MS_PER_DAY); // 正數=未來, 負數=過去
+
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Tomorrow';
+    if (diff === -1) return 'Yesterday';
+    if (diff > 1) return `In ${diff} days`;
+    // diff <= -2
+    return `${Math.abs(diff)} days ago`;
+  } catch {
+    return 'Selected day';
+  }
+}
+
+/* 產生橫條上要顯示的 7 天（中心為 selectedDate） */
+function buildStripDates(centerYMD, range = 3) {
+  const dates = [];
+  const center = new Date(centerYMD);
+
+  for (let offset = -range; offset <= range; offset += 1) {
+    const d = new Date(center);
+    d.setDate(d.getDate() + offset);
+    const ymd = d.toISOString().slice(0, 10);
+    const week = d.toLocaleDateString(undefined, { weekday: 'short' }); // Mon, Tue...
+    const day = d.getDate();
+    dates.push({ ymd, week, day });
+  }
+
+  return dates;
+}
+
+export default function MainScreen() {
+  const [selectedDate, setSelectedDate] = useState(todayYMD());
   const [loading, setLoading] = useState(true);
+  const [subgoals, setSubgoals] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showMonth, setShowMonth] = useState(false);
 
-  // 編輯用 state
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [title, setTitle] = useState('');
-  const [etaDays, setEtaDays] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  // 詳細檢視 modal
-  const [selected, setSelected] = useState(null);
-  const [plan, setPlan] = useState([]);
+  const loadForDate = useCallback(
+    async (dateString) => {
+      try {
+        setLoading(true);
+        const rows = await db.listSubgoalsForDate(dateString);
+        setSubgoals(rows);
+      } catch (e) {
+        console.error('[MainScreen] loadForDate error:', e);
+        Alert.alert('Error', e.message || 'Failed to load tasks.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    fetchGoals();
+    loadForDate(selectedDate);
   }, []);
 
-  // ✅ 回到畫面時自動刷新（建立/編輯後回 Main 會更新）
-  useFocusEffect(
-    React.useCallback(() => {
-      fetchGoals();
-    }, [])
-  );
+  const changeDate = (ymd) => {
+    setSelectedDate(ymd);
+    loadForDate(ymd);
+  };
 
-  // 🧩 抓 goals 與 subgoals
-  const fetchGoals = async () => {
-    setLoading(true);
+  const shiftDays = (delta) => {
     try {
-      const { data: g, error: gErr } = await supabase
-        .from('goals')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (gErr) throw gErr;
-
-      const { data: s, error: sErr } = await supabase
-        .from('subgoals')
-        .select('*');
-      if (sErr) throw sErr;
-
-      setGoals(g || []);
-      setSubgoals(s || []);
+      const d = new Date(selectedDate);
+      d.setDate(d.getDate() + delta);
+      const next = d.toISOString().slice(0, 10);
+      changeDate(next);
     } catch (e) {
-      console.error('[fetchGoals]', e);
-      Alert.alert('Error fetching goals');
-    } finally {
-      setLoading(false);
+      console.error('[MainScreen] shiftDays error:', e);
     }
   };
 
-  // 🧠 開啟詳細檢視：整理 AI 拆解的 phase 結構
-  const openDetail = (goal) => {
-    const list = subgoals.filter((s) => s.goal_id === goal.id);
-    const grouped = list.reduce((acc, cur) => {
-      if (!acc[cur.phase_number]) {
-        acc[cur.phase_number] = {
-          phase_no: cur.phase_number,
-          title: cur.phase_name || `Phase ${cur.phase_number}`,
-          subgoals: [],
-        };
-      }
-      acc[cur.phase_number].subgoals.push({ title: cur.subgoal_title });
-      return acc;
-    }, {});
-    setPlan(Object.values(grouped));
-    setSelected(goal);
+  const handleDayPress = (day) => {
+    const dateStr = day.dateString;
+    changeDate(dateStr);
+    setShowMonth(false);
   };
 
-  // ✏️ 編輯按鈕
-  const openEdit = (goal) => {
-    setEditingId(goal.id);
-    setTitle(goal.title || '');
-    setEtaDays(goal.eta_days != null ? String(goal.eta_days) : '');
-    setModalVisible(true);
-  };
-
-  // 💾 儲存編輯
-  const saveEdit = async () => {
-    const trimmed = title.trim();
-    if (!trimmed) {
-      Alert.alert('請輸入目標名稱');
-      return;
-    }
-    const eta = etaDays === '' ? null : Math.max(0, parseInt(etaDays, 10) || 0);
-
+  const onRefresh = async () => {
+    setRefreshing(true);
     try {
-      setSaving(true);
-      const { error: upErr } = await supabase
-        .from('goals')
-        .update({ title: trimmed, eta_days: eta })
-        .eq('id', editingId);
-      if (upErr) throw upErr;
+      await loadForDate(selectedDate);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
-      setGoals((prev) =>
-        prev.map((g) => (g.id === editingId ? { ...g, title: trimmed, eta_days: eta } : g))
+  const toggleSubgoal = async (item) => {
+    try {
+      const toDone = item.status !== 'done';
+      const updated = await db.toggleSubgoalDone(item.id, toDone);
+      setSubgoals((prev) =>
+        prev.map((s) => (s.id === item.id ? { ...s, status: updated.status } : s))
       );
-      setModalVisible(false);
     } catch (e) {
-      console.log('[saveEdit] error', e);
-      Alert.alert('錯誤', String(e));
-    } finally {
-      setSaving(false);
+      console.error('[MainScreen] toggleSubgoal error:', e);
+      Alert.alert('Error', e.message || 'Failed to update status.');
     }
   };
 
-  // 🗑 刪除目標
-  const deleteGoal = async (id) => {
-    const go = async () => {
-      try {
-        const { error: delErr } = await supabase.from('goals').delete().eq('id', id);
-        if (delErr) throw delErr;
-        setGoals((prev) => prev.filter((g) => g.id !== id));
-      } catch (e) {
-        Alert.alert('刪除失敗', String(e));
-      }
-    };
+  const renderSubgoalItem = ({ item }) => {
+    const done = item.status === 'done';
 
-    if (Platform.OS === 'web') {
-      if (window.confirm?.('確定要刪除這個目標嗎？')) await go();
-    } else {
-      Alert.alert('刪除目標', '確定要刪除嗎？', [
-        { text: '取消' },
-        { text: '刪除', style: 'destructive', onPress: () => go() },
-      ]);
-    }
-  };
-
-  // 📊 計算子目標完成率
-  const calcProgress = (goalId) => {
-    const list = subgoals.filter((s) => s.goal_id === goalId);
-    if (!list.length) return 0;
-    const done = list.filter((s) => s.status === 'done').length;
-    return done / list.length;
-  };
-
-  const renderItem = ({ item }) => (
-    <TouchableOpacity onPress={() => openDetail(item)} activeOpacity={0.8}>
-      <View style={styles.card}>
+    return (
+      <View style={styles.taskCard}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.meta}>
-            ETA: {item.eta_days ?? '-'} days • {item.category || 'Uncategorized'}
+          <Text style={styles.goalTitle}>{item.goal_title || 'Untitled Goal'}</Text>
+          <Text
+            style={[
+              styles.subgoalTitle,
+              done && { textDecorationLine: 'line-through', color: '#9CA3AF' },
+            ]}
+          >
+            {item.subgoal_title}
           </Text>
-          <ProgressBar progress={calcProgress(item.id)} />
+          <View style={styles.metaRow}>
+            {item.phase_number != null && (
+              <View style={styles.chip}>
+                <Text style={styles.chipText}>Phase {item.phase_number}</Text>
+              </View>
+            )}
+            {item.goal_category && (
+              <View style={[styles.chip, { backgroundColor: '#EEF2FF' }]}>
+                <Text style={[styles.chipText, { color: '#4F46E5' }]}>{item.goal_category}</Text>
+              </View>
+            )}
+          </View>
         </View>
-        <View style={styles.actions}>
-          <TouchableOpacity onPress={() => openEdit(item)} style={styles.actionBtn}>
-            <Text style={styles.actionTxt}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => deleteGoal(item.id)} style={styles.actionBtn}>
-            <Text style={[styles.actionTxt, { color: '#c0392b' }]}>Del</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
 
-  const handleSubgoalStatusChange = (goalId, subgoalId, newStatus) => {
-    setSubgoals((prev) =>
-      prev.map((s) =>
-        s.id === subgoalId ? { ...s, status: newStatus } : s
-      )
+        <TouchableOpacity
+          onPress={() => toggleSubgoal(item)}
+          style={styles.checkBox}
+          activeOpacity={0.7}
+        >
+          <Text style={{ fontSize: 20 }}>{done ? '✅' : '⬜'}</Text>
+        </TouchableOpacity>
+      </View>
     );
   };
 
-  if (loading) return <ActivityIndicator style={{ marginTop: 40 }} />;
+  const headerLabel = relativeLabel(selectedDate);      // 🔹 動態顯示 Today / Tomorrow / ... 
+  const headerDate = formatHeaderDate(selectedDate);
+  const stripDates = buildStripDates(selectedDate, 3);
+  const markedDates = { [selectedDate]: { selected: true, selectedColor: '#2563EB' } };
 
   return (
     <View style={styles.container}>
-      {/* ✅ Add Goal 已移到 Header 右上角 */}
-      <FlatList
-        data={goals}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={renderItem}
-        style={{ marginTop: 12 }}
-        ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 20 }}>尚無目標</Text>}
-      />
+      {/* 上方日期區塊（左邊顯示「Today / In 3 days」+ 完整日期，右邊保留 Today 按鈕） */}
+      <View style={styles.todayBlock}>
+        <View>
+          <Text style={styles.todayLabel}>{headerLabel}</Text>
+          <Text style={styles.todayDate}>{headerDate}</Text>
+        </View>
 
-      {/* 編輯目標 Modal */}
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalWrap}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Edit Goal</Text>
-            <TextInput
-              placeholder="Goal title"
-              value={title}
-              onChangeText={setTitle}
-              style={styles.input}
-            />
-            <TextInput
-              placeholder="ETA (days)"
-              value={etaDays}
-              onChangeText={setEtaDays}
-              keyboardType="number-pad"
-              style={styles.input}
-            />
-            <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
-              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.actionBtn}>
-                <Text style={styles.actionTxt}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={saveEdit} disabled={saving} style={styles.actionBtn}>
-                <Text style={[styles.actionTxt, { color: saving ? '#aaa' : '#111' }]}>
-                  {saving ? 'Saving...' : 'Save'}
+        <TouchableOpacity
+          style={styles.todayBtn}
+          onPress={() => {
+            const t = todayYMD();
+            setShowMonth(false);
+            changeDate(t);
+          }}
+        >
+          <Text style={styles.todayBtnText}>Today</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 一條「7 天橫條」 */}
+      <View style={styles.dayStrip}>
+        <TouchableOpacity
+          onPress={() => shiftDays(-3)}
+          style={styles.navArrow}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.navArrowText}>‹</Text>
+        </TouchableOpacity>
+
+        <View style={styles.dayStripCenter}>
+          {stripDates.map((d) => {
+            const isSelected = d.ymd === selectedDate;
+            return (
+              <TouchableOpacity
+                key={d.ymd}
+                onPress={() => {
+                  if (isSelected) {
+                    setShowMonth((v) => !v);
+                  } else {
+                    setShowMonth(false);
+                    changeDate(d.ymd);
+                  }
+                }}
+                style={[styles.dayPill, isSelected && styles.dayPillSelected]}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[styles.dayPillWeek, isSelected && styles.dayPillWeekSelected]}
+                >
+                  {d.week}
+                </Text>
+                <Text
+                  style={[styles.dayPillDate, isSelected && styles.dayPillDateSelected]}
+                >
+                  {d.day}
                 </Text>
               </TouchableOpacity>
-            </View>
-          </View>
+            );
+          })}
         </View>
-      </Modal>
 
-      {/* 詳細計畫檢視 */}
-      <GoalDetailModal
-        visible={!!selected}
-        title={selected?.title}
-        plan={plan}
-        onClose={() => setSelected(null)}
-        onStatusChange={handleSubgoalStatusChange}
-      />
+        <TouchableOpacity
+          onPress={() => shiftDays(3)}
+          style={styles.navArrow}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.navArrowText}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 展開月曆 */}
+      {showMonth && (
+        <Calendar
+          current={selectedDate}
+          onDayPress={handleDayPress}
+          markedDates={markedDates}
+          enableSwipeMonths={true}
+          style={styles.calendar}
+          theme={{
+            todayTextColor: '#2563EB',
+            arrowColor: '#111827',
+          }}
+        />
+      )}
+
+      {/* Tasks Header */}
+      <View style={styles.listHeader}>
+        <Text style={styles.listTitle}>Tasks for this day</Text>
+        <Text style={styles.listCount}>{subgoals.length} item(s)</Text>
+      </View>
+
+      {/* Tasks List */}
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 16 }} />
+      ) : subgoals.length === 0 ? (
+        <Text style={styles.emptyText}>No tasks for this day.</Text>
+      ) : (
+        <FlatList
+          data={subgoals}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={renderSubgoalItem}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          onRefresh={onRefresh}
+          refreshing={refreshing}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, flex: 1, backgroundColor: '#fff' },
-  card: {
-    padding: 14,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 10,
-    elevation: 1,
+  container: { flex: 1, backgroundColor: '#F9FAFB', paddingHorizontal: 16, paddingTop: 8 },
+
+  todayBlock: {
     flexDirection: 'row',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#eee',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  title: { fontSize: 16, fontWeight: '600' },
-  meta: { marginTop: 6, color: '#666' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  actionBtn: { paddingVertical: 6, paddingHorizontal: 10, backgroundColor: '#f5f5f5', borderRadius: 8 },
-  actionTxt: { fontWeight: '600' },
-  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'center', padding: 16 },
-  modalCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16 },
-  modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  input: { borderWidth: 1, borderColor: '#ddd', padding: 10, borderRadius: 10, marginBottom: 10 },
+  todayLabel: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  todayDate: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+
+  todayBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+  },
+  todayBtnText: { fontSize: 13, color: '#111827', fontWeight: '600' },
+
+  dayStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  navArrow: {
+    width: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navArrowText: { fontSize: 20, color: '#111827', fontWeight: '600' },
+
+  dayStripCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dayPill: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderRadius: 999,
+    flex: 1,
+    marginHorizontal: 2,
+  },
+  dayPillSelected: {
+    backgroundColor: '#2563EB',
+  },
+  dayPillWeek: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  dayPillWeekSelected: {
+    color: '#E5E7EB',
+  },
+  dayPillDate: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  dayPillDateSelected: {
+    color: '#FFFFFF',
+  },
+
+  calendar: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+
+  listHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: 8,
+  },
+  listTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  listCount: { fontSize: 12, color: '#9CA3AF' },
+
+  taskCard: {
+    flexDirection: 'row',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  goalTitle: { fontSize: 13, color: '#6B7280', marginBottom: 2 },
+  subgoalTitle: { fontSize: 15, color: '#111827', marginBottom: 6 },
+
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#F3F4F6',
+  },
+  chipText: { fontSize: 11, color: '#4B5563', fontWeight: '500' },
+
+  checkBox: { justifyContent: 'center', alignItems: 'center', paddingLeft: 8 },
+
+  emptyText: { marginTop: 16, textAlign: 'center', color: '#9CA3AF' },
 });

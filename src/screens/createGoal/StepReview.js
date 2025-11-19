@@ -91,23 +91,19 @@ async function callAI(payload) {
   return JSON.parse(txt);
 }
 
-/* ---------- 可愛 Loading 動畫 ---------- */
+/* ---------- Loading 動畫 ---------- */
 function GeneratingOverlay() {
-  const dot1 = useRef(new Animated.Value(0)).current;
-  const dot2 = useRef(new Animated.Value(0)).current;
-  const dot3 = useRef(new Animated.Value(0)).current;
-
+  const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
   useEffect(() => {
     const createAnim = (dot, delay) =>
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(dot, { toValue: -8, duration: 350, useNativeDriver: true }),
-          Animated.timing(dot, { toValue: 0, duration: 350, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: -8, duration: 300, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: 300, useNativeDriver: true }),
         ])
       );
-
-    const anims = [createAnim(dot1, 0), createAnim(dot2, 150), createAnim(dot3, 300)];
+    const anims = dots.map((d, i) => createAnim(d, i * 150));
     anims.forEach((a) => a.start());
     return () => anims.forEach((a) => a.stop());
   }, []);
@@ -117,18 +113,17 @@ function GeneratingOverlay() {
       <ActivityIndicator size="large" color="#2563EB" />
       <Text style={styles.overlayText}>Generating your AI plan</Text>
       <View style={styles.dotRow}>
-        <Animated.View style={[styles.dot, { transform: [{ translateY: dot1 }] }]} />
-        <Animated.View style={[styles.dot, { transform: [{ translateY: dot2 }] }]} />
-        <Animated.View style={[styles.dot, { transform: [{ translateY: dot3 }] }]} />
+        {dots.map((dot, i) => (
+          <Animated.View key={i} style={[styles.dot, { transform: [{ translateY: dot }] }]} />
+        ))}
       </View>
-      <Text style={styles.overlaySub}>This may take around 10–15 seconds</Text>
+      <Text style={styles.overlaySub}>This may take 10–15 seconds</Text>
     </View>
   );
 }
 
 export default function StepReview({ formData, updateFormData, goNextPage, goPrevPage }) {
   const [loading, setLoading] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   const summary = useMemo(() => {
     const { start, target, etaDays } = computeDates(formData);
@@ -144,70 +139,17 @@ export default function StepReview({ formData, updateFormData, goNextPage, goPre
     };
   }, [formData]);
 
-  /* ---------- 產生 AI 計劃 ---------- */
   const handleGeneratePlan = async () => {
     setLoading(true);
     try {
       const payload = buildGoalPayload(formData);
+      console.log('[Sending to Gemini]', JSON.stringify(payload, null, 2));
       const data = await callAI(payload);
       updateFormData({ aiPlan: data });
-      goNextPage(); // ⬅️ 進入 Step 9（StepResult）
+      goNextPage();
     } catch (err) {
       console.error('[AI Error]', err);
       Alert.alert('AI Error', err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /* ---------- 儲存資料 ---------- */
-  const handleSaveToDB = async () => {
-    if (!formData.aiPlan || saved) return;
-    setLoading(true);
-    try {
-      const { data: userData, error: userErr } = await supabase.auth.getUser();
-      if (userErr) throw userErr;
-      const userId = userData?.user?.id;
-      if (!userId) throw new Error('User not logged in.');
-
-      const { start, target, etaDays } = computeDates(formData);
-      const goalObj = {
-        user_id: userId,
-        title: formData.title,
-        category: formData.category,
-        description: formData.description || '',
-        priority: formData.priority || 'Medium',
-        start_date: start.toISOString(),
-        target_date: target.toISOString(),
-        eta_days: etaDays,
-        num_phases: formData.numPhases || 3,
-        current_phase: 1,
-      };
-
-      const { data: goals, error: gErr } = await supabase.from('goals').insert([goalObj]).select();
-      if (gErr) throw gErr;
-
-      const goalId = goals?.[0]?.id;
-      const subInserts = [];
-      for (const phase of formData.aiPlan) {
-        for (const s of phase.subgoals || []) {
-          subInserts.push({
-            goal_id: goalId,
-            phase_number: phase.phase_no,
-            phase_name: phase.title,
-            subgoal_title: s.title,
-            subgoal_description: s.title || '',
-            status: 'pending',
-          });
-        }
-      }
-      if (subInserts.length) await supabase.from('subgoals').insert(subInserts);
-
-      setSaved(true);
-      Alert.alert('✅ Success', 'Goal and AI plan saved!');
-    } catch (err) {
-      console.error('[Save error]', err);
-      Alert.alert('Error', err.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }
@@ -218,7 +160,7 @@ export default function StepReview({ formData, updateFormData, goNextPage, goPre
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Review Your Goal</Text>
-      <Text style={styles.subtitle}>Quickly check the essentials before generating your AI plan.</Text>
+      <Text style={styles.subtitle}>Quickly check before generating your AI plan.</Text>
 
       <View style={styles.card}>
         <Row icon="🏷️" label="Category" value={summary.category} />
@@ -239,7 +181,7 @@ export default function StepReview({ formData, updateFormData, goNextPage, goPre
   );
 }
 
-/* ---------- 小元件 ---------- */
+/* ---------- Row 小元件 ---------- */
 function Row({ icon, label, value }) {
   return (
     <View style={styles.row}>

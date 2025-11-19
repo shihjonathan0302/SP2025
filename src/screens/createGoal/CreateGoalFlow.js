@@ -35,7 +35,7 @@ export default function CreateGoalFlow({ navigation }) {
     StepDetails_Page1,
     StepDetails_Page2,
     StepReview,
-    StepResult,
+    StepResult, // ✅ 最後一頁改用 FlatList 控制滾動
   ];
   const totalSteps = steps.length;
   const StepComponent = steps[step];
@@ -48,12 +48,12 @@ export default function CreateGoalFlow({ navigation }) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 180,
+          duration: 150,
           useNativeDriver: true,
         }),
         Animated.timing(translateAnim, {
-          toValue: direction === 'next' ? -20 : 20,
-          duration: 180,
+          toValue: direction === 'next' ? -25 : 25,
+          duration: 150,
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
@@ -61,12 +61,12 @@ export default function CreateGoalFlow({ navigation }) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 220,
+          duration: 200,
           useNativeDriver: true,
         }),
         Animated.timing(translateAnim, {
           toValue: 0,
-          duration: 220,
+          duration: 200,
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
@@ -78,14 +78,14 @@ export default function CreateGoalFlow({ navigation }) {
   const goNextPage = () => {
     if (step < totalSteps - 1) {
       animateTransition('next');
-      setTimeout(() => setStep((s) => s + 1), 160);
+      setTimeout(() => setStep((s) => s + 1), 120);
     }
   };
 
   const goPrevPage = () => {
     if (step > 0) {
       animateTransition('prev');
-      setTimeout(() => setStep((s) => s - 1), 160);
+      setTimeout(() => setStep((s) => s - 1), 120);
     }
   };
 
@@ -93,45 +93,58 @@ export default function CreateGoalFlow({ navigation }) {
   const progress = ((step + 1) / totalSteps) * 100;
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        { opacity: fadeAnim, transform: [{ translateX: translateAnim }] },
-      ]}
-    >
-      {/* 🔵 頂部 Progress Indicator */}
+    <View style={styles.root}>
+      {/* 頂部 Progress Indicator */}
       <View style={styles.progressContainer}>
         <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progress}%` }]} />
+          <Animated.View
+            style={[
+              styles.progressFill,
+              { width: `${progress}%`, opacity: fadeAnim },
+            ]}
+          />
         </View>
         <Text style={styles.progressText}>
           Step {step + 1} / {totalSteps}
         </Text>
       </View>
 
-      {/* 🧩 動態載入對應 Step */}
-      <StepComponent
-        formData={formData}
-        updateFormData={updateFormData}
-        goNextPage={goNextPage}
-        goPrevPage={goPrevPage}
-        nextStep={goNextPage} // ✅ 相容舊版命名
-        prevStep={goPrevPage}
-        navigation={navigation}
-      />
-    </Animated.View>
+      {/* 🧩 主要動畫切換區域 */}
+      <Animated.View
+        style={[
+          styles.animatedContainer,
+          { opacity: fadeAnim, transform: [{ translateX: translateAnim }] },
+        ]}
+      >
+        <StepComponent
+          formData={formData}
+          updateFormData={updateFormData}
+          goNextPage={goNextPage}
+          goPrevPage={goPrevPage}
+          nextStep={goNextPage} // 相容舊版命名
+          prevStep={goPrevPage}
+          navigation={navigation}
+        />
+      </Animated.View>
+    </View>
   );
 }
 
+/* ---------------- Styles ---------------- */
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFF',
+  },
+  animatedContainer: {
+    flex: 1,
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
   progressContainer: {
-    marginBottom: 12,
+    paddingTop: 8,
+    paddingBottom: 6,
+    backgroundColor: '#FFF',
     alignItems: 'center',
   },
   progressTrack: {
