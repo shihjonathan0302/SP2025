@@ -8,7 +8,9 @@ import {
   Pressable,
   Keyboard,
   ScrollView,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
+  Text,
+  StyleSheet,
 } from 'react-native';
 import {
   NavigationContainer,
@@ -49,22 +51,69 @@ Notifications.setNotificationHandler({
 const Tab = createBottomTabNavigator();
 const RootJSStack = createStackNavigator();
 
-/* ---------------- Tabs ---------------- */
-function Tabs() {
+/* ------------------------------------------------
+ * Custom Bottom TabBar (liquid glass pill style)
+ * ----------------------------------------------*/
+function CustomTabBar({ state, descriptors, navigation }) {
   return (
-    <Tab.Navigator
-      initialRouteName='Main'
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarShowLabel: false,
-        tabBarIcon: ({ color }) => {
+    <View style={tabStyles.wrapper}>
+      <View style={tabStyles.pill}>
+        {state.routes.map((route, index) => {
+          const isFocused = state.index === index;
+
           let icon = 'ellipse';
           if (route.name === 'Main') icon = 'home-outline';
           if (route.name === 'Reports') icon = 'bar-chart-outline';
           if (route.name === 'Community') icon = 'people-outline';
-          return <Ionicons name={icon} size={22} color={color} />;
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          return (
+            <TouchableOpacity
+              key={route.key}
+              onPress={onPress}
+              style={tabStyles.tabButton}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={icon}
+                size={22}
+                color={isFocused ? '#2563EB' : '#E5E7EB'}
+              />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+/* ---------------- Tabs ---------------- */
+function Tabs() {
+  return (
+    <Tab.Navigator
+      initialRouteName="Main"
+      screenOptions={{
+        headerShown: false,
+        tabBarShowLabel: false,
+        tabBarStyle: {
+          position: 'absolute',
+          backgroundColor: 'transparent',
+          elevation: 0,
+          borderTopWidth: 0,
+          height: 80,
         },
-      })}
+      }}
+      tabBar={(props) => <CustomTabBar {...props} />}
     >
       <Tab.Screen name="Reports" component={ReportsStackNavigator} />
       <Tab.Screen name="Main" component={MainScreen} />
@@ -73,21 +122,25 @@ function Tabs() {
   );
 }
 
-/* ---------------- Modal 包裝：穩定自適應高度 + 點背景關閉 ---------------- */
+/* ------------------------------------------------
+ * Create Goal Modal Wrapper
+ * ----------------------------------------------*/
 function ModalCardWrapper({ navigation }) {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-  // 監聽鍵盤狀態
   useEffect(() => {
-    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    const showSub = Keyboard.addListener('keyboardDidShow', () =>
+      setKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener('keyboardDidHide', () =>
+      setKeyboardVisible(false)
+    );
     return () => {
       showSub.remove();
       hideSub.remove();
     };
   }, []);
 
-  // ✅ 改良邏輯：有鍵盤 → 先收鍵盤；沒有鍵盤 → 關視窗
   const handleBackgroundPress = () => {
     if (keyboardVisible) {
       Keyboard.dismiss();
@@ -105,10 +158,8 @@ function ModalCardWrapper({ navigation }) {
         alignItems: 'center',
       }}
     >
-      {/* 背景遮罩 */}
       <Pressable onPress={handleBackgroundPress} style={{ position: 'absolute', inset: 0 }} />
 
-      {/* 浮動卡片 */}
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <View
           style={{
@@ -128,7 +179,6 @@ function ModalCardWrapper({ navigation }) {
           <ScrollView
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{}}
           >
             <CreateGoalFlow />
           </ScrollView>
@@ -138,12 +188,123 @@ function ModalCardWrapper({ navigation }) {
   );
 }
 
+/* ------------------------------------------------
+ * Custom Header (Dashboard 文字靠左 + 下拉 + 右側 icons)
+ * ----------------------------------------------*/
+function AppHeader({ navigation, currentTab }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const titleMap = {
+    Main: 'Dashboard',
+    Reports: 'Reports',
+    Community: 'Community',
+  };
+  const title = titleMap[currentTab] ?? 'Dashboard';
+
+  const handleGoTab = (screenName) => {
+    setMenuOpen(false);
+    navigation.navigate('RootTabs', { screen: screenName });
+  };
+
+  const handleGoSettings = () => {
+    setMenuOpen(false);
+    navigation.navigate('Settings');
+  };
+
+  return (
+    <View style={headerStyles.container}>
+      {/* 下層白底，模擬卡片感覺 */}
+      <View style={headerStyles.inner}>
+        {/* 左側：標題 + 下拉箭頭 */}
+        <TouchableOpacity
+          style={headerStyles.titleRow}
+          activeOpacity={0.8}
+          onPress={() => setMenuOpen((v) => !v)}
+        >
+          <Text style={headerStyles.titleText}>{title}</Text>
+          <Ionicons
+            name={menuOpen ? 'chevron-up-outline' : 'chevron-down-outline'}
+            size={18}
+            color="#111827"
+          />
+        </TouchableOpacity>
+
+        {/* 右側：+ 以及 Settings（四方格） */}
+        <View style={headerStyles.rightRow}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('CreateGoalFlow')}
+            style={headerStyles.iconBtn}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add-outline" size={22} color="#111827" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleGoSettings}
+            style={headerStyles.iconBtn}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="grid-outline" size={22} color="#111827" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* 下拉選單 */}
+      {menuOpen && (
+        <>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setMenuOpen(false)}
+          />
+          <View style={headerStyles.menu}>
+            <HeaderMenuItem
+              label="Dashboard"
+              active={currentTab === 'Main'}
+              onPress={() => handleGoTab('Main')}
+            />
+            <HeaderMenuItem
+              label="Reports"
+              active={currentTab === 'Reports'}
+              onPress={() => handleGoTab('Reports')}
+            />
+            <HeaderMenuItem
+              label="Community"
+              active={currentTab === 'Community'}
+              onPress={() => handleGoTab('Community')}
+            />
+            <View style={headerStyles.menuDivider} />
+            <HeaderMenuItem label="Settings" onPress={handleGoSettings} />
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
+function HeaderMenuItem({ label, onPress, active }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[headerStyles.menuItem, active && headerStyles.menuItemActive]}
+      activeOpacity={0.9}
+    >
+      <Text
+        style={[
+          headerStyles.menuItemText,
+          active && headerStyles.menuItemTextActive,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 /* ---------------- Root Stack ---------------- */
 function RootNavigator({ isSignedIn }) {
   return (
     <RootJSStack.Navigator
       screenOptions={{
-        headerTitleAlign: 'center',
         gestureEnabled: true,
         gestureDirection: 'horizontal',
         cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
@@ -156,72 +317,24 @@ function RootNavigator({ isSignedIn }) {
             component={Tabs}
             options={({ navigation, route }) => {
               const focused = getFocusedRouteNameFromRoute(route) ?? 'Main';
-              const titleMap = {
-                Main: 'Dashboard',
-                Reports: 'Reports',
-                Community: 'Community',
-              };
-              const headerTitle = titleMap[focused] ?? 'Dashboard';
 
               return {
-                headerTitle,
-                headerTitleAlign: 'center',
-                headerStyle: {
-                  height: 145,
-                  backgroundColor: '#F9FAFB',
-                  shadowColor: '#000',
-                  elevation: 4,
-                },
-                headerTitleStyle: {
-                  fontSize: 18,
-                  fontWeight: '700',
-                },
-                headerLeft: () => (
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate('Settings')}
-                    accessibilityRole="button"
-                    accessibilityLabel="Open settings"
-                    style={{
-                      marginLeft: 15,
-                      width: 40,
-                      height: 40,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: '#E5E7EB',
-                      backgroundColor: '#FFF',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Ionicons name="settings-outline" size={26} color="#111827" />
-                  </TouchableOpacity>
+                header: (props) => (
+                  <AppHeader
+                    {...props}
+                    navigation={navigation}
+                    currentTab={focused}
+                  />
                 ),
-                headerRight: () =>
-                  focused === 'Main' ? (
-                    <TouchableOpacity
-                      onPress={() => navigation.navigate('CreateGoalFlow')}
-                      accessibilityRole="button"
-                      accessibilityLabel="Add goal"
-                      style={{
-                        marginRight: 15,
-                        width: 40,
-                        height: 40,
-                        borderRadius: 12,
-                        borderWidth: 1,
-                        borderColor: '#E5E7EB',
-                        backgroundColor: '#FFF',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Ionicons name="add-circle-outline" size={26} color="#2563EB" />
-                    </TouchableOpacity>
-                  ) : null,
+                headerStyle: {
+                  backgroundColor: '#F3F4F6',
+                  elevation: 0,
+                  shadowOpacity: 0,
+                },
               };
             }}
           />
 
-          {/* 使用穩定版浮動 Modal */}
           <RootJSStack.Screen
             name="CreateGoalFlow"
             component={ModalCardWrapper}
@@ -346,3 +459,114 @@ export default function App() {
     </GoalsProvider>
   );
 }
+
+/* ---------------- Styles ---------------- */
+
+const tabStyles = StyleSheet.create({
+  wrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 18,
+    alignItems: 'center',
+  },
+  pill: {
+    flexDirection: 'row',
+    backgroundColor: '#111827',
+    borderRadius: 999,
+    paddingHorizontal: 28,
+    paddingVertical: 10,
+    minWidth: 220,
+    maxWidth: 320,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+  },
+});
+
+const headerStyles = StyleSheet.create({
+  container: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    paddingTop: 8,
+  },
+  inner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  titleText: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  rightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  menu: {
+    position: 'absolute',
+    top: 52,
+    left: 16,
+    width: 170,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  menuItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  menuItemActive: {
+    backgroundColor: '#EEF2FF',
+  },
+  menuItemText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  menuItemTextActive: {
+    color: '#4F46E5',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 4,
+  },
+});
